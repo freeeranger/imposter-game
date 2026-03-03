@@ -181,7 +181,7 @@ function App() {
   const PrimaryIcon = primaryIcon;
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-background p-4 transition-colors">
+    <div className="relative box-border flex h-dvh min-h-dvh w-full items-center justify-center overflow-hidden bg-background p-4 transition-colors">
       <Button
         variant="outline"
         size="icon"
@@ -207,7 +207,7 @@ function App() {
         animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.22 } }}
         className="mx-auto w-full max-w-md"
       >
-      <Card className="flex h-[36rem] max-h-[calc(100vh-2rem)] w-full flex-col overflow-hidden rounded-lg shadow-lg">
+      <Card className="flex h-full w-full flex-col overflow-hidden rounded-lg shadow-lg">
         <CardHeader className="text-center">
           <CardTitle className="text-3xl font-bold tracking-tight">Imposter</CardTitle>
           <CardDescription>Find the imposter among you.</CardDescription>
