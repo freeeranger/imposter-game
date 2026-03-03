@@ -1,6 +1,6 @@
 {
   "name": "Car Brands",
-  "entries": [
+  "easy": [
     "Toyota",
     "Honda",
     "Ford",
@@ -19,37 +19,37 @@
     "Mazda",
     "Ferrari",
     "Lamborghini",
-    "Aston Martin",
     "Bentley",
+    "Volvo",
+    "Skoda",
+    "Jeep",
+    "Koenigsegg"
+  ],
+  "hard": [
+    "Peugeot",
+    "SEAT",
+    "Renault",
+    "Citroën",
+    "Aston Martin",
     "Rolls-Royce",
     "Jaguar",
     "Land Rover",
-    "Volvo",
     "Fiat",
     "Alfa Romeo",
     "Maserati",
     "Bugatti",
-    "Jeep",
     "Chrysler",
     "Dodge",
     "Ram",
     "Cadillac",
-    "Buick",
     "GMC",
     "Lincoln",
     "Infiniti",
     "Acura",
     "Mitsubishi",
     "Suzuki",
-    "Genesis",
     "Lotus",
     "McLaren",
-    "Pagani",
-    "Koenigsegg",
-    "Peugeot",
-    "Renault",
-    "Citroën",
-    "Skoda",
-    "SEAT"
+    "Pagani"
   ]
 }

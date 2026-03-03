@@ -10,12 +10,14 @@ import { Eye, EyeOff, Users, Play, RotateCcw, Shuffle } from "lucide-react";
 
 type CategoryFile = {
   name: string;
-  entries: string[];
+  easy: string[];
+  hard: string[];
 };
 
 type Category = {
   label: string;
-  data: string[];
+  easy: string[];
+  hard: string[];
 };
 
 const categoryFiles = import.meta.glob<{ default: CategoryFile }>("./data/*.json", { eager: true });
@@ -24,13 +26,25 @@ const CATEGORIES: Record<string, Category> = Object.fromEntries(
   Object.entries(categoryFiles).map(([path, module]) => {
     const fileName = path.split("/").pop() ?? path;
     const key = fileName.replace(".json", "");
-    const { name, entries } = module.default;
-    return [key, { label: name, data: entries }];
+    const { name, easy, hard } = module.default;
+    return [key, { label: name, easy, hard }];
   }),
 );
 
 const CATEGORY_KEYS = Object.keys(CATEGORIES);
 const DEFAULT_CATEGORY = CATEGORY_KEYS[0] ?? "random";
+type Difficulty = "easy" | "hard" | "all";
+const DIFFICULTY_DESCRIPTIONS: Record<Difficulty, string> = {
+  easy: "More obvious words that most players recognize quickly.",
+  hard: "More niche words that are less obvious and trickier to discuss.",
+  all: "Mixes both easy and hard words.",
+};
+
+const getCategoryWords = (category: Category, difficulty: Difficulty): string[] => {
+  if (difficulty === "easy") return category.easy;
+  if (difficulty === "hard") return category.hard;
+  return [...category.easy, ...category.hard];
+};
 
 type GameState = "setup" | "pass" | "reveal" | "end";
 
@@ -39,6 +53,7 @@ function App() {
   const [playersCount, setPlayersCount] = useState<number>(4);
   const [impostersCount, setImpostersCount] = useState<number>(1);
   const [selectedCategory, setSelectedCategory] = useState<string | "random">(DEFAULT_CATEGORY);
+  const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>("all");
   const [randomizeStarter, setRandomizeStarter] = useState<boolean>(true);
   
   const [randomPool, setRandomPool] = useState<Record<string, boolean>>(
@@ -56,7 +71,9 @@ function App() {
     
     let chosenCategory: string;
     if (selectedCategory === "random") {
-      const available = CATEGORY_KEYS.filter((key) => randomPool[key]);
+      const available = CATEGORY_KEYS.filter(
+        (key) => randomPool[key] && getCategoryWords(CATEGORIES[key], selectedDifficulty).length > 0,
+      );
       if (available.length === 0) return; // Must have at least one category selected
       chosenCategory = available[Math.floor(Math.random() * available.length)];
     } else {
@@ -73,7 +90,7 @@ function App() {
       }
     }
 
-    const categoryData = CATEGORIES[chosenCategory].data;
+    const categoryData = getCategoryWords(CATEGORIES[chosenCategory], selectedDifficulty);
     if (categoryData.length === 0) return;
     const randomWord = categoryData[Math.floor(Math.random() * categoryData.length)];
 
@@ -103,8 +120,10 @@ function App() {
   const hasCategories = CATEGORY_KEYS.length > 0;
   const isStartDisabled =
     !hasCategories ||
-    (selectedCategory === "random" && !Object.values(randomPool).some(Boolean)) ||
-    (selectedCategory !== "random" && !CATEGORIES[selectedCategory]) ||
+    (selectedCategory === "random" &&
+      !CATEGORY_KEYS.some((key) => randomPool[key] && getCategoryWords(CATEGORIES[key], selectedDifficulty).length > 0)) ||
+    (selectedCategory !== "random" &&
+      (!CATEGORIES[selectedCategory] || getCategoryWords(CATEGORIES[selectedCategory], selectedDifficulty).length === 0)) ||
     impostersCount >= playersCount;
 
   return (
@@ -173,6 +192,26 @@ function App() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="difficulty">Word Difficulty</Label>
+                  <Select
+                    value={selectedDifficulty}
+                    onValueChange={(value) => setSelectedDifficulty(value as Difficulty)}
+                  >
+                    <SelectTrigger id="difficulty">
+                      <SelectValue placeholder="Select word difficulty" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="easy">Easy</SelectItem>
+                      <SelectItem value="hard">Hard</SelectItem>
+                      <SelectItem value="all">All</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground">
+                    {DIFFICULTY_DESCRIPTIONS[selectedDifficulty]}
+                  </p>
                 </div>
 
                 {selectedCategory === "random" && (
