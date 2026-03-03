@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { NumberStepper } from "@/components/ui/number-stepper";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
+import { AnimatePresence, motion } from "framer-motion";
+import type { LucideIcon } from "lucide-react";
 import { Eye, EyeOff, Moon, Play, RotateCcw, Shuffle, Sun, Users } from "lucide-react";
+import type { ButtonProps } from "@/components/ui/button";
 
 type CategoryFile = {
   name: string;
@@ -36,6 +39,17 @@ type GameState = "setup" | "pass" | "reveal" | "end";
 type Theme = "light" | "dark";
 
 const THEME_STORAGE_KEY = "imposter-game-theme";
+const PANEL_TRANSITION = { duration: 0.2, ease: [0.22, 1, 0.36, 1] as const };
+const PANEL_VARIANTS = {
+  initial: (direction: number) => ({ opacity: 0, x: direction > 0 ? 30 : -30, scale: 0.995 }),
+  animate: { opacity: 1, x: 0, scale: 1, transition: PANEL_TRANSITION },
+  exit: (direction: number) => ({
+    opacity: 0,
+    x: direction > 0 ? -24 : 24,
+    scale: 0.995,
+    transition: { duration: 0.14, ease: [0.4, 0, 1, 1] as const },
+  }),
+};
 
 function App() {
   const [theme, setTheme] = useState<Theme>(() => {
@@ -63,6 +77,7 @@ function App() {
   const [activeCategory, setActiveCategory] = useState<string>(DEFAULT_CATEGORY === "random" ? "" : DEFAULT_CATEGORY);
   const [currentPlayer, setCurrentPlayer] = useState<number>(1);
   const [startingPlayer, setStartingPlayer] = useState<number | null>(null);
+  const [transitionDirection, setTransitionDirection] = useState<1 | -1>(1);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -106,10 +121,12 @@ function App() {
       setStartingPlayer(null);
     }
     
+    setTransitionDirection(1);
     setGameState("pass");
   };
 
   const nextTurn = () => {
+    setTransitionDirection(1);
     if (currentPlayer < playersCount) {
       setCurrentPlayer(currentPlayer + 1);
       setGameState("pass");
@@ -118,12 +135,50 @@ function App() {
     }
   };
 
+  const revealRole = () => {
+    setTransitionDirection(1);
+    setGameState("reveal");
+  };
+
+  const resetToSetup = () => {
+    setTransitionDirection(-1);
+    setGameState("setup");
+  };
+
   const hasCategories = CATEGORY_KEYS.length > 0;
   const isStartDisabled =
     !hasCategories ||
     (selectedCategory === "random" && !Object.values(randomPool).some(Boolean)) ||
     (selectedCategory !== "random" && !CATEGORIES[selectedCategory]) ||
     impostersCount >= playersCount;
+
+  const panelKey = gameState === "pass" || gameState === "reveal" ? `${gameState}-${currentPlayer}` : gameState;
+
+  let primaryLabel = "Start Game";
+  let primaryIcon: LucideIcon = Play;
+  let primaryVariant: ButtonProps["variant"] = "default";
+  let primaryDisabled = isStartDisabled;
+  let primaryAction = startGame;
+
+  if (gameState === "pass") {
+    primaryLabel = "Reveal Role";
+    primaryIcon = Eye;
+    primaryDisabled = false;
+    primaryAction = revealRole;
+  } else if (gameState === "reveal") {
+    primaryLabel = "Hide & Next";
+    primaryIcon = EyeOff;
+    primaryVariant = "secondary";
+    primaryDisabled = false;
+    primaryAction = nextTurn;
+  } else if (gameState === "end") {
+    primaryLabel = "New Game";
+    primaryIcon = RotateCcw;
+    primaryDisabled = false;
+    primaryAction = resetToSetup;
+  }
+
+  const PrimaryIcon = primaryIcon;
 
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-background p-4 transition-colors">
@@ -134,17 +189,34 @@ function App() {
         onClick={() => setTheme((currentTheme) => (currentTheme === "dark" ? "light" : "dark"))}
         aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
       >
-        {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.span
+            key={theme}
+            initial={{ opacity: 0, rotate: -35, scale: 0.8 }}
+            animate={{ opacity: 1, rotate: 0, scale: 1, transition: { duration: 0.16 } }}
+            exit={{ opacity: 0, rotate: 35, scale: 0.8, transition: { duration: 0.12 } }}
+            className="inline-flex"
+          >
+            {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          </motion.span>
+        </AnimatePresence>
       </Button>
 
-      <Card className="mx-auto flex h-[36rem] max-h-[calc(100vh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-lg shadow-lg">
+      <motion.div
+        initial={{ opacity: 0, y: 10, scale: 0.99 }}
+        animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.22 } }}
+        className="mx-auto w-full max-w-md"
+      >
+      <Card className="flex h-[36rem] max-h-[calc(100vh-2rem)] w-full flex-col overflow-hidden rounded-lg shadow-lg">
         <CardHeader className="text-center">
           <CardTitle className="text-3xl font-bold tracking-tight">Imposter</CardTitle>
           <CardDescription>Find the imposter among you.</CardDescription>
         </CardHeader>
         <CardContent className="flex-1 overflow-y-auto [scrollbar-gutter:stable]">
+          <div className="flex min-h-full flex-col justify-center">
+          <AnimatePresence mode="wait" initial={false} custom={transitionDirection}>
           {gameState === "setup" && (
-            <div className="space-y-6">
+            <motion.div key={panelKey} custom={transitionDirection} variants={PANEL_VARIANTS} initial="initial" animate="animate" exit="exit" className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="players">Players</Label>
@@ -238,20 +310,11 @@ function App() {
                 />
               </div>
 
-              <Button 
-                onClick={startGame} 
-                className="w-full h-12 text-lg mt-4" 
-                size="lg"
-                disabled={isStartDisabled}
-              >
-                <Play className="mr-2 w-5 h-5" />
-                Start Game
-              </Button>
-            </div>
+            </motion.div>
           )}
 
           {gameState === "pass" && (
-            <div className="text-center space-y-8 py-6">
+            <motion.div key={panelKey} custom={transitionDirection} variants={PANEL_VARIANTS} initial="initial" animate="animate" exit="exit" className="text-center space-y-8 py-6">
               <div className="space-y-2">
                 <h2 className="text-2xl font-semibold text-muted-foreground">Pass device to</h2>
                 <p className="text-5xl font-bold text-primary">Player {currentPlayer}</p>
@@ -259,15 +322,11 @@ function App() {
               <p className="text-sm text-muted-foreground">
                 Make sure no one else is looking at the screen.
               </p>
-              <Button onClick={() => setGameState("reveal")} className="w-full h-14 text-xl" size="lg">
-                <Eye className="mr-2 w-6 h-6" />
-                Reveal Role
-              </Button>
-            </div>
+            </motion.div>
           )}
 
           {gameState === "reveal" && (
-            <div className="text-center space-y-8 py-6">
+            <motion.div key={panelKey} custom={transitionDirection} variants={PANEL_VARIANTS} initial="initial" animate="animate" exit="exit" className="text-center space-y-8 py-6">
               <h2 className="text-xl font-semibold text-muted-foreground">Player {currentPlayer}</h2>
               <div className="rounded-lg bg-muted/60 p-8">
                 {imposterIndices.includes(currentPlayer - 1) ? (
@@ -292,39 +351,60 @@ function App() {
                   </div>
                 )}
               </div>
-              <Button onClick={nextTurn} className="w-full h-14 text-xl" variant="secondary" size="lg">
-                <EyeOff className="mr-2 w-6 h-6" />
-                Hide & Next
-              </Button>
-            </div>
+            </motion.div>
           )}
 
           {gameState === "end" && (
-            <div className="text-center space-y-8 py-6">
+            <motion.div key={panelKey} custom={transitionDirection} variants={PANEL_VARIANTS} initial="initial" animate="animate" exit="exit" className="text-center space-y-8 py-6">
               <div className="space-y-4">
                 <h2 className="text-3xl font-bold text-primary">Game Started!</h2>
                 <p className="text-lg text-muted-foreground">
                   Everyone has seen their role. Start discussing and find out who the imposter is!
                 </p>
                 {startingPlayer && (
-                  <div className="mt-6 rounded-lg border border-primary/20 bg-primary/10 p-4">
+                  <motion.div
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0, transition: { duration: 0.16, delay: 0.03 } }}
+                    className="mt-6 rounded-lg border border-primary/20 bg-primary/10 p-4"
+                  >
                     <div className="flex items-center justify-center gap-2 mb-2">
                       <Shuffle className="w-5 h-5 text-primary" />
                       <p className="text-sm font-semibold uppercase tracking-wider text-primary">Random Starter</p>
                     </div>
                     <p className="text-2xl font-bold text-foreground">Player {startingPlayer}</p>
                     <p className="text-sm text-muted-foreground mt-1">goes first this round!</p>
-                  </div>
+                  </motion.div>
                 )}
               </div>
-              <Button onClick={() => setGameState("setup")} className="w-full h-14 text-xl mt-8" size="lg">
-                <RotateCcw className="mr-2 w-6 h-6" />
-                New Game
-              </Button>
-            </div>
+            </motion.div>
           )}
+          </AnimatePresence>
+          </div>
         </CardContent>
+        <CardFooter className="shrink-0 border-t bg-card px-6 pb-6 pt-4">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={`footer-${panelKey}`}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0, transition: { duration: 0.15 } }}
+              exit={{ opacity: 0, y: -8, transition: { duration: 0.1 } }}
+              className="w-full"
+            >
+              <Button
+                onClick={primaryAction}
+                className="h-14 w-full text-xl transition-transform duration-150 hover:scale-[1.01] active:scale-[0.99]"
+                size="lg"
+                variant={primaryVariant}
+                disabled={primaryDisabled}
+              >
+                <PrimaryIcon className="mr-2 h-6 w-6" />
+                {primaryLabel}
+              </Button>
+            </motion.div>
+          </AnimatePresence>
+        </CardFooter>
       </Card>
+      </motion.div>
     </div>
   );
 }
