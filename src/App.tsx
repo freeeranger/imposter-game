@@ -6,22 +6,31 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
-import countries from "./data/countries.json";
-import celebrities from "./data/celebrities.json";
-import artists from "./data/artists.json";
-import movies from "./data/movies.json";
-import carBrands from "./data/car_brands.json";
 import { Eye, EyeOff, Users, Play, RotateCcw, Shuffle } from "lucide-react";
 
-type CategoryKey = "countries" | "celebrities" | "artists" | "movies" | "car_brands";
-
-const CATEGORIES: Record<CategoryKey, { label: string; data: string[] }> = {
-  countries: { label: "Countries", data: countries },
-  celebrities: { label: "Celebrities", data: celebrities },
-  artists: { label: "Artists", data: artists },
-  movies: { label: "Movies", data: movies },
-  car_brands: { label: "Car Brands", data: carBrands },
+type CategoryFile = {
+  name: string;
+  entries: string[];
 };
+
+type Category = {
+  label: string;
+  data: string[];
+};
+
+const categoryFiles = import.meta.glob<{ default: CategoryFile }>("./data/*.json", { eager: true });
+
+const CATEGORIES: Record<string, Category> = Object.fromEntries(
+  Object.entries(categoryFiles).map(([path, module]) => {
+    const fileName = path.split("/").pop() ?? path;
+    const key = fileName.replace(".json", "");
+    const { name, entries } = module.default;
+    return [key, { label: name, data: entries }];
+  }),
+);
+
+const CATEGORY_KEYS = Object.keys(CATEGORIES);
+const DEFAULT_CATEGORY = CATEGORY_KEYS[0] ?? "random";
 
 type GameState = "setup" | "pass" | "reveal" | "end";
 
@@ -29,32 +38,29 @@ function App() {
   const [gameState, setGameState] = useState<GameState>("setup");
   const [playersCount, setPlayersCount] = useState<number>(4);
   const [impostersCount, setImpostersCount] = useState<number>(1);
-  const [selectedCategory, setSelectedCategory] = useState<CategoryKey | "random">("countries");
+  const [selectedCategory, setSelectedCategory] = useState<string | "random">(DEFAULT_CATEGORY);
   const [randomizeStarter, setRandomizeStarter] = useState<boolean>(true);
   
-  const [randomPool, setRandomPool] = useState<Record<CategoryKey, boolean>>({
-    countries: true,
-    celebrities: true,
-    artists: true,
-    movies: true,
-    car_brands: true,
-  });
+  const [randomPool, setRandomPool] = useState<Record<string, boolean>>(
+    Object.fromEntries(CATEGORY_KEYS.map((key) => [key, true])),
+  );
 
   const [imposterIndices, setImposterIndices] = useState<number[]>([]);
   const [targetWord, setTargetWord] = useState<string>("");
-  const [activeCategory, setActiveCategory] = useState<CategoryKey>("countries");
+  const [activeCategory, setActiveCategory] = useState<string>(DEFAULT_CATEGORY === "random" ? "" : DEFAULT_CATEGORY);
   const [currentPlayer, setCurrentPlayer] = useState<number>(1);
   const [startingPlayer, setStartingPlayer] = useState<number | null>(null);
 
   const startGame = () => {
     if (playersCount < 3) return; // Need at least 3 players
     
-    let chosenCategory: CategoryKey;
+    let chosenCategory: string;
     if (selectedCategory === "random") {
-      const available = (Object.keys(CATEGORIES) as CategoryKey[]).filter(key => randomPool[key]);
+      const available = CATEGORY_KEYS.filter((key) => randomPool[key]);
       if (available.length === 0) return; // Must have at least one category selected
       chosenCategory = available[Math.floor(Math.random() * available.length)];
     } else {
+      if (!CATEGORIES[selectedCategory]) return;
       chosenCategory = selectedCategory;
     }
 
@@ -68,6 +74,7 @@ function App() {
     }
 
     const categoryData = CATEGORIES[chosenCategory].data;
+    if (categoryData.length === 0) return;
     const randomWord = categoryData[Math.floor(Math.random() * categoryData.length)];
 
     setImposterIndices(indices);
@@ -93,7 +100,12 @@ function App() {
     }
   };
 
-  const isStartDisabled = (selectedCategory === "random" && !(Object.values(randomPool).some(Boolean))) || impostersCount >= playersCount;
+  const hasCategories = CATEGORY_KEYS.length > 0;
+  const isStartDisabled =
+    !hasCategories ||
+    (selectedCategory === "random" && !Object.values(randomPool).some(Boolean)) ||
+    (selectedCategory !== "random" && !CATEGORIES[selectedCategory]) ||
+    impostersCount >= playersCount;
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
@@ -145,7 +157,7 @@ function App() {
                   <Label htmlFor="category">Category</Label>
                   <Select
                     value={selectedCategory}
-                    onValueChange={(value) => setSelectedCategory(value as CategoryKey | "random")}
+                    onValueChange={(value) => setSelectedCategory(value as string | "random")}
                   >
                     <SelectTrigger id="category">
                       <SelectValue placeholder="Select a category" />
@@ -167,7 +179,7 @@ function App() {
                   <div className="bg-slate-100 dark:bg-slate-900 rounded-lg p-4 space-y-3 border">
                     <Label className="text-sm text-muted-foreground block mb-2">Include Categories:</Label>
                     <div className="grid grid-cols-2 gap-3">
-                      {(Object.keys(CATEGORIES) as CategoryKey[]).map((key) => (
+                      {CATEGORY_KEYS.map((key) => (
                         <div key={key} className="flex items-center space-x-2">
                           <Checkbox 
                             id={`pool-${key}`} 
@@ -238,7 +250,7 @@ function App() {
                   <div className="space-y-2">
                     <p className="text-4xl font-black text-red-500">YOU ARE THE IMPOSTER</p>
                     <p className="text-lg text-muted-foreground mt-4">
-                      Category: <span className="font-semibold text-foreground">{CATEGORIES[activeCategory].label}</span>
+                      Category: <span className="font-semibold text-foreground">{CATEGORIES[activeCategory]?.label}</span>
                     </p>
                     <p className="text-sm text-muted-foreground mt-2">
                       Try to blend in and guess the word!
@@ -251,7 +263,7 @@ function App() {
                     </p>
                     <p className="text-4xl font-black text-primary">{targetWord}</p>
                     <p className="text-lg text-muted-foreground mt-4">
-                      Category: <span className="font-semibold text-foreground">{CATEGORIES[activeCategory].label}</span>
+                      Category: <span className="font-semibold text-foreground">{CATEGORIES[activeCategory]?.label}</span>
                     </p>
                   </div>
                 )}
