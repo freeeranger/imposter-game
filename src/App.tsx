@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
+import { NumberStepper } from "@/components/ui/number-stepper";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Eye, EyeOff, Users, Play, RotateCcw, Shuffle } from "lucide-react";
+import { Eye, EyeOff, Moon, Play, RotateCcw, Shuffle, Sun, Users } from "lucide-react";
 
 type CategoryFile = {
   name: string;
@@ -33,8 +33,21 @@ const CATEGORY_KEYS = Object.keys(CATEGORIES);
 const DEFAULT_CATEGORY = CATEGORY_KEYS[0] ?? "random";
 
 type GameState = "setup" | "pass" | "reveal" | "end";
+type Theme = "light" | "dark";
+
+const THEME_STORAGE_KEY = "imposter-game-theme";
 
 function App() {
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window === "undefined") return "light";
+
+    const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+    if (savedTheme === "light" || savedTheme === "dark") {
+      return savedTheme;
+    }
+
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  });
   const [gameState, setGameState] = useState<GameState>("setup");
   const [playersCount, setPlayersCount] = useState<number>(4);
   const [impostersCount, setImpostersCount] = useState<number>(1);
@@ -50,6 +63,11 @@ function App() {
   const [activeCategory, setActiveCategory] = useState<string>(DEFAULT_CATEGORY === "random" ? "" : DEFAULT_CATEGORY);
   const [currentPlayer, setCurrentPlayer] = useState<number>(1);
   const [startingPlayer, setStartingPlayer] = useState<number | null>(null);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+  }, [theme]);
 
   const startGame = () => {
     if (playersCount < 3) return; // Need at least 3 players
@@ -108,47 +126,53 @@ function App() {
     impostersCount >= playersCount;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md mx-auto shadow-lg">
+    <div className="relative flex min-h-screen items-center justify-center bg-background p-4 transition-colors">
+      <Button
+        variant="outline"
+        size="icon"
+        className="absolute right-4 top-4 rounded-full md:right-6 md:top-6"
+        onClick={() => setTheme((currentTheme) => (currentTheme === "dark" ? "light" : "dark"))}
+        aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+      >
+        {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+      </Button>
+
+      <Card className="mx-auto flex h-[36rem] max-h-[calc(100vh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-lg shadow-lg">
         <CardHeader className="text-center">
           <CardTitle className="text-3xl font-bold tracking-tight">Imposter</CardTitle>
           <CardDescription>Find the imposter among you.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-1 overflow-y-auto [scrollbar-gutter:stable]">
           {gameState === "setup" && (
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="players">Players (Min: 3)</Label>
-                  <div className="flex items-center gap-2">
-                    <Users className="w-5 h-5 text-muted-foreground" />
-                    <Input
-                      id="players"
-                      type="number"
-                      min={3}
-                      max={20}
-                      value={playersCount}
-                      onChange={(e) => {
-                        const val = Math.max(3, parseInt(e.target.value) || 3);
-                        setPlayersCount(val);
-                        if (impostersCount >= val) setImpostersCount(val - 1);
-                      }}
-                    />
-                  </div>
+                  <Label htmlFor="players">Players</Label>
+                  <NumberStepper
+                    id="players"
+                    min={3}
+                    max={20}
+                    value={playersCount}
+                    onChange={(value) => {
+                      setPlayersCount(value);
+                      if (impostersCount >= value) {
+                        setImpostersCount(Math.max(1, value - 1));
+                      }
+                    }}
+                    icon={Users}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="imposters">Imposters</Label>
-                  <div className="flex items-center gap-2">
-                    <Users className="w-5 h-5 text-red-500" />
-                    <Input
-                      id="imposters"
-                      type="number"
-                      min={1}
-                      max={playersCount - 1}
-                      value={impostersCount}
-                      onChange={(e) => setImpostersCount(Math.max(1, Math.min(playersCount - 1, parseInt(e.target.value) || 1)))}
-                    />
-                  </div>
+                  <NumberStepper
+                    id="imposters"
+                    min={1}
+                    max={playersCount - 1}
+                    value={impostersCount}
+                    onChange={setImpostersCount}
+                    icon={Users}
+                    iconClassName="text-red-500"
+                  />
                 </div>
               </div>
 
@@ -176,7 +200,7 @@ function App() {
                 </div>
 
                 {selectedCategory === "random" && (
-                  <div className="bg-slate-100 dark:bg-slate-900 rounded-lg p-4 space-y-3 border">
+                  <div className="space-y-3 rounded-lg border bg-muted/40 p-4">
                     <Label className="text-sm text-muted-foreground block mb-2">Include Categories:</Label>
                     <div className="grid grid-cols-2 gap-3">
                       {CATEGORY_KEYS.map((key) => (
@@ -245,7 +269,7 @@ function App() {
           {gameState === "reveal" && (
             <div className="text-center space-y-8 py-6">
               <h2 className="text-xl font-semibold text-muted-foreground">Player {currentPlayer}</h2>
-              <div className="p-8 rounded-xl bg-slate-100 dark:bg-slate-800">
+              <div className="rounded-lg bg-muted/60 p-8">
                 {imposterIndices.includes(currentPlayer - 1) ? (
                   <div className="space-y-2">
                     <p className="text-4xl font-black text-red-500">YOU ARE THE IMPOSTER</p>
@@ -283,7 +307,7 @@ function App() {
                   Everyone has seen their role. Start discussing and find out who the imposter is!
                 </p>
                 {startingPlayer && (
-                  <div className="mt-6 p-4 bg-primary/10 rounded-lg border border-primary/20">
+                  <div className="mt-6 rounded-lg border border-primary/20 bg-primary/10 p-4">
                     <div className="flex items-center justify-center gap-2 mb-2">
                       <Shuffle className="w-5 h-5 text-primary" />
                       <p className="text-sm font-semibold uppercase tracking-wider text-primary">Random Starter</p>
