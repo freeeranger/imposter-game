@@ -39,7 +39,7 @@
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
-    --radius: 0.85rem
+    --radius: 0.85rem;
   }
   .dark {
     --background: 222 24% 10%;
@@ -65,11 +65,12 @@
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%
+    --chart-5: 340 75% 55%;
   }
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: "Google Sans", "Google Sans Text", "Helvetica Neue", Arial, sans-serif;
+    font-family:
+      "Google Sans", "Google Sans Text", "Helvetica Neue", Arial, sans-serif;
   }
 }

@@ -1,22 +1,23 @@
-import { useState } from "react"
-import { type LucideIcon, Minus, Plus } from "lucide-react"
+import { useState } from "react";
+import { type LucideIcon, Minus, Plus } from "lucide-react";
 
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type NumberStepperProps = {
-  id: string
-  value: number
-  min: number
-  max: number
-  step?: number
-  onChange: (value: number) => void
-  icon?: LucideIcon
-  iconClassName?: string
-}
+  id: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  onChange: (value: number) => void;
+  icon?: LucideIcon;
+  iconClassName?: string;
+};
 
-const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value))
+const clamp = (value: number, min: number, max: number) =>
+  Math.max(min, Math.min(max, value));
 
 function NumberStepper({
   id,
@@ -28,18 +29,20 @@ function NumberStepper({
   icon: Icon,
   iconClassName,
 }: NumberStepperProps) {
-  const [draftValue, setDraftValue] = useState<string | null>(null)
-  const displayValue = draftValue ?? String(value)
+  const [draftValue, setDraftValue] = useState<string | null>(null);
+  const displayValue = draftValue ?? String(value);
 
   const updateValue = (nextValue: number) => {
-    const clamped = clamp(nextValue, min, max)
-    setDraftValue(null)
-    onChange(clamped)
-  }
+    const clamped = clamp(nextValue, min, max);
+    setDraftValue(null);
+    onChange(clamped);
+  };
 
   return (
     <div className="flex items-center gap-2">
-      {Icon && <Icon className={cn("h-5 w-5 text-muted-foreground", iconClassName)} />}
+      {Icon && (
+        <Icon className={cn("h-5 w-5 text-muted-foreground", iconClassName)} />
+      )}
       <div className="flex flex-1 items-center gap-1 rounded-lg border bg-background p-1">
         <Button
           type="button"
@@ -61,41 +64,41 @@ function NumberStepper({
           value={displayValue}
           onFocus={() => {
             if (draftValue === null) {
-              setDraftValue(String(value))
+              setDraftValue(String(value));
             }
           }}
           onBlur={() => {
-            const currentText = draftValue ?? String(value)
+            const currentText = draftValue ?? String(value);
 
             if (currentText.trim() === "") {
-              setDraftValue(null)
-              return
+              setDraftValue(null);
+              return;
             }
 
-            const nextValue = Number.parseInt(currentText, 10)
+            const nextValue = Number.parseInt(currentText, 10);
             if (Number.isNaN(nextValue)) {
-              setDraftValue(null)
-              return
+              setDraftValue(null);
+              return;
             }
 
-            const clamped = clamp(nextValue, min, max)
-            setDraftValue(null)
-            onChange(clamped)
+            const clamped = clamp(nextValue, min, max);
+            setDraftValue(null);
+            onChange(clamped);
           }}
           onChange={(event) => {
-            const nextText = event.target.value
-            setDraftValue(nextText)
+            const nextText = event.target.value;
+            setDraftValue(nextText);
 
             if (nextText.trim() === "") {
-              return
+              return;
             }
 
-            const nextValue = Number.parseInt(nextText, 10)
+            const nextValue = Number.parseInt(nextText, 10);
             if (Number.isNaN(nextValue)) {
-              return
+              return;
             }
 
-            onChange(clamp(nextValue, min, max))
+            onChange(clamp(nextValue, min, max));
           }}
           className="h-8 border-0 bg-transparent text-center text-sm shadow-none [appearance:textfield] focus-visible:ring-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         />
@@ -112,7 +115,7 @@ function NumberStepper({
         </Button>
       </div>
     </div>
-  )
+  );
 }
 
-export { NumberStepper }
+export { NumberStepper };
