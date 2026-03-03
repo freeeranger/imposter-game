@@ -22,6 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { AnimatePresence, motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import {
+  CircleHelp,
   Eye,
   EyeOff,
   Moon,
@@ -63,8 +64,8 @@ const CATEGORY_KEYS = Object.keys(CATEGORIES);
 const DEFAULT_CATEGORY = CATEGORY_KEYS[0] ?? "random";
 type Difficulty = "easy" | "hard" | "all";
 const DIFFICULTY_DESCRIPTIONS: Record<Difficulty, string> = {
-  easy: "More obvious words that most players recognize quickly.",
-  hard: "More niche words that are less obvious and trickier to discuss.",
+  easy: "More common and obvious words.",
+  hard: "More niche and less obvious words.",
   all: "Mixes both easy and hard words.",
 };
 
@@ -375,7 +376,17 @@ function App() {
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="difficulty">Word Difficulty</Label>
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="difficulty">Word Difficulty</Label>
+                          <button
+                            type="button"
+                            className="inline-flex text-muted-foreground"
+                            title="Easy uses more common words. Hard uses more niche words. All mixes both."
+                            aria-label="Word difficulty info"
+                          >
+                            <CircleHelp className="h-4 w-4" />
+                          </button>
+                        </div>
                         <Select
                           value={selectedDifficulty}
                           onValueChange={(value) =>
