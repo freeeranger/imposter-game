@@ -274,7 +274,7 @@ function App() {
             </CardTitle>
             <CardDescription>Find the imposter among you.</CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto [scrollbar-gutter:stable]">
+          <CardContent className="flex-1 flex flex-col justify-center overflow-y-auto [scrollbar-gutter:stable]">
             <div className="flex min-h-full flex-col justify-center">
               <AnimatePresence
                 mode="wait"
