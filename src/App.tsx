@@ -22,7 +22,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { AnimatePresence, motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import {
-  CircleHelp,
   Eye,
   EyeOff,
   Moon,
