@@ -376,17 +376,7 @@ function App() {
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Label htmlFor="difficulty">Word Difficulty</Label>
-                          <button
-                            type="button"
-                            className="inline-flex text-muted-foreground"
-                            title="Easy uses more common words. Hard uses more niche words. All mixes both."
-                            aria-label="Word difficulty info"
-                          >
-                            <CircleHelp className="h-4 w-4" />
-                          </button>
-                        </div>
+                        <Label htmlFor="difficulty">Word Difficulty</Label>
                         <Select
                           value={selectedDifficulty}
                           onValueChange={(value) =>
