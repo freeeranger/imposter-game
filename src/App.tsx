@@ -30,6 +30,7 @@ import {
   Shuffle,
   Sun,
   Users,
+  VenetianMask,
 } from "lucide-react";
 import type { ButtonProps } from "@/components/ui/button";
 
@@ -76,6 +77,11 @@ const getCategoryWords = (category: Category, difficulty: Difficulty): string[] 
 
 type GameState = "setup" | "pass" | "reveal" | "end";
 type Theme = "light" | "dark";
+type PrankMode = "everyone-imposter" | "different-words" | "no-imposter";
+type PlayerAssignment = {
+  isImposter: boolean;
+  word: string | null;
+};
 
 const THEME_STORAGE_KEY = "imposter-game-theme";
 const PANEL_TRANSITION = { duration: 0.2, ease: [0.22, 1, 0.36, 1] as const };
@@ -93,6 +99,28 @@ const PANEL_VARIANTS = {
     transition: { duration: 0.14, ease: [0.4, 0, 1, 1] as const },
   }),
 };
+
+const pickRandom = <T,>(items: T[]): T =>
+  items[Math.floor(Math.random() * items.length)];
+
+const shuffle = <T,>(items: T[]): T[] => {
+  const shuffled = [...items];
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [
+      shuffled[swapIndex],
+      shuffled[index],
+    ];
+  }
+
+  return shuffled;
+};
+
+const getUniqueCategoryWords = (
+  category: Category,
+  difficulty: Difficulty,
+): string[] => Array.from(new Set(getCategoryWords(category, difficulty)));
 
 function App() {
   const [theme, setTheme] = useState<Theme>(() => {
@@ -116,13 +144,15 @@ function App() {
   const [selectedDifficulty, setSelectedDifficulty] =
     useState<Difficulty>("all");
   const [randomizeStarter, setRandomizeStarter] = useState<boolean>(true);
+  const [prankProbability, setPrankProbability] = useState<number>(10);
 
   const [randomPool, setRandomPool] = useState<Record<string, boolean>>(
     Object.fromEntries(CATEGORY_KEYS.map((key) => [key, true])),
   );
 
-  const [imposterIndices, setImposterIndices] = useState<number[]>([]);
-  const [targetWord, setTargetWord] = useState<string>("");
+  const [playerAssignments, setPlayerAssignments] = useState<PlayerAssignment[]>(
+    [],
+  );
   const [activeCategory, setActiveCategory] = useState<string>(
     DEFAULT_CATEGORY === "random" ? "" : DEFAULT_CATEGORY,
   );
@@ -138,34 +168,80 @@ function App() {
   const startGame = () => {
     if (playersCount < 3) return; // Need at least 3 players
 
-    let chosenCategory: string;
-    if (selectedCategory === "random") {
-      const available = CATEGORY_KEYS.filter(
-        (key) => randomPool[key] && getCategoryWords(CATEGORIES[key], selectedDifficulty).length > 0,
-      );
-      if (available.length === 0) return; // Must have at least one category selected
-      chosenCategory = available[Math.floor(Math.random() * available.length)];
-    } else {
-      if (!CATEGORIES[selectedCategory]) return;
-      chosenCategory = selectedCategory;
-    }
+    const availableCategories =
+      selectedCategory === "random"
+        ? CATEGORY_KEYS.filter(
+            (key) =>
+              randomPool[key] &&
+              getUniqueCategoryWords(CATEGORIES[key], selectedDifficulty)
+                .length > 0,
+          )
+        : CATEGORIES[selectedCategory]
+          ? [selectedCategory]
+          : [];
 
-    // Pick random indices for imposters
-    const indices: number[] = [];
-    while (indices.length < impostersCount) {
-      const idx = Math.floor(Math.random() * playersCount);
-      if (!indices.includes(idx)) {
-        indices.push(idx);
+    if (availableCategories.length === 0) return;
+
+    const chosenCategory = pickRandom(availableCategories);
+    const categoryWords = getUniqueCategoryWords(
+      CATEGORIES[chosenCategory],
+      selectedDifficulty,
+    );
+
+    if (categoryWords.length === 0) return;
+
+    let assignments: PlayerAssignment[];
+
+    const shouldUsePrank =
+      prankProbability > 0 && Math.random() < prankProbability / 100;
+
+    if (shouldUsePrank) {
+      const availablePranks: PrankMode[] = [
+        "everyone-imposter",
+        "no-imposter",
+      ];
+
+      if (categoryWords.length >= playersCount) {
+        availablePranks.push("different-words");
       }
+
+      const prankMode = pickRandom(availablePranks);
+
+      if (prankMode === "everyone-imposter") {
+        assignments = Array.from({ length: playersCount }, () => ({
+          isImposter: true,
+          word: null,
+        }));
+      } else if (prankMode === "different-words") {
+        assignments = shuffle(categoryWords)
+          .slice(0, playersCount)
+          .map((word) => ({
+            isImposter: false,
+            word,
+          }));
+      } else {
+        const sharedWord = pickRandom(categoryWords);
+        assignments = Array.from({ length: playersCount }, () => ({
+          isImposter: false,
+          word: sharedWord,
+        }));
+      }
+    } else {
+      const imposterIndices = new Set(
+        shuffle(Array.from({ length: playersCount }, (_, index) => index)).slice(
+          0,
+          impostersCount,
+        ),
+      );
+      const sharedWord = pickRandom(categoryWords);
+
+      assignments = Array.from({ length: playersCount }, (_, index) => ({
+        isImposter: imposterIndices.has(index),
+        word: imposterIndices.has(index) ? null : sharedWord,
+      }));
     }
 
-    const categoryData = getCategoryWords(CATEGORIES[chosenCategory], selectedDifficulty);
-    if (categoryData.length === 0) return;
-    const randomWord =
-      categoryData[Math.floor(Math.random() * categoryData.length)];
-
-    setImposterIndices(indices);
-    setTargetWord(randomWord);
+    setPlayerAssignments(assignments);
     setActiveCategory(chosenCategory);
     setCurrentPlayer(1);
 
@@ -244,6 +320,7 @@ function App() {
   }
 
   const PrimaryIcon = primaryIcon;
+  const currentAssignment = playerAssignments[currentPlayer - 1];
 
   return (
     <div className="relative box-border flex h-dvh min-h-dvh w-full items-center justify-center overflow-hidden bg-background p-4 transition-colors">
@@ -348,6 +425,21 @@ function App() {
                     </div>
 
                     <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="prank-probability">
+                          Prank Probability
+                        </Label>
+                        <NumberStepper
+                          id="prank-probability"
+                          min={0}
+                          max={100}
+                          value={prankProbability}
+                          onChange={setPrankProbability}
+                          icon={VenetianMask}
+                          iconClassName="text-amber-500"
+                          suffix="%"
+                        />
+                      </div>
                       <div className="space-y-2">
                         <Label htmlFor="category">Category</Label>
                         <Select
@@ -485,7 +577,7 @@ function App() {
                       Player {currentPlayer}
                     </h2>
                     <div className="rounded-lg bg-muted/60 p-8">
-                      {imposterIndices.includes(currentPlayer - 1) ? (
+                      {currentAssignment?.isImposter ? (
                         <div className="space-y-2">
                           <p className="text-4xl font-black text-red-500">
                             YOU ARE THE IMPOSTER
@@ -497,7 +589,7 @@ function App() {
                             </span>
                           </p>
                           <p className="text-sm text-muted-foreground mt-2">
-                            Try to blend in and guess the word!
+                            Try to blend in with the rest of the table.
                           </p>
                         </div>
                       ) : (
@@ -506,7 +598,7 @@ function App() {
                             The Word Is
                           </p>
                           <p className="text-4xl font-black text-primary">
-                            {targetWord}
+                            {currentAssignment?.word ?? "No word"}
                           </p>
                           <p className="text-lg text-muted-foreground mt-4">
                             Category:{" "}
@@ -535,8 +627,8 @@ function App() {
                         Game Started!
                       </h2>
                       <p className="text-lg text-muted-foreground">
-                        Everyone has seen their role. Start discussing and find
-                        out who the imposter is!
+                        Everyone has seen their role. Start discussing and
+                        figure out what is going on this round.
                       </p>
                       {startingPlayer && (
                         <motion.div

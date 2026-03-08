@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { type LucideIcon, Minus, Plus } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -14,6 +15,7 @@ type NumberStepperProps = {
   onChange: (value: number) => void;
   icon?: LucideIcon;
   iconClassName?: string;
+  suffix?: ReactNode;
 };
 
 const clamp = (value: number, min: number, max: number) =>
@@ -28,6 +30,7 @@ function NumberStepper({
   onChange,
   icon: Icon,
   iconClassName,
+  suffix,
 }: NumberStepperProps) {
   const [draftValue, setDraftValue] = useState<string | null>(null);
   const displayValue = draftValue ?? String(value);
@@ -55,53 +58,63 @@ function NumberStepper({
         >
           <Minus className="h-4 w-4" />
         </Button>
-        <Input
-          id={id}
-          type="number"
-          min={min}
-          max={max}
-          step={step}
-          value={displayValue}
-          onFocus={() => {
-            if (draftValue === null) {
-              setDraftValue(String(value));
-            }
-          }}
-          onBlur={() => {
-            const currentText = draftValue ?? String(value);
+        <div className="relative flex-1">
+          <Input
+            id={id}
+            type="number"
+            min={min}
+            max={max}
+            step={step}
+            value={displayValue}
+            onFocus={() => {
+              if (draftValue === null) {
+                setDraftValue(String(value));
+              }
+            }}
+            onBlur={() => {
+              const currentText = draftValue ?? String(value);
 
-            if (currentText.trim() === "") {
+              if (currentText.trim() === "") {
+                setDraftValue(null);
+                return;
+              }
+
+              const nextValue = Number.parseInt(currentText, 10);
+              if (Number.isNaN(nextValue)) {
+                setDraftValue(null);
+                return;
+              }
+
+              const clamped = clamp(nextValue, min, max);
               setDraftValue(null);
-              return;
-            }
+              onChange(clamped);
+            }}
+            onChange={(event) => {
+              const nextText = event.target.value;
+              setDraftValue(nextText);
 
-            const nextValue = Number.parseInt(currentText, 10);
-            if (Number.isNaN(nextValue)) {
-              setDraftValue(null);
-              return;
-            }
+              if (nextText.trim() === "") {
+                return;
+              }
 
-            const clamped = clamp(nextValue, min, max);
-            setDraftValue(null);
-            onChange(clamped);
-          }}
-          onChange={(event) => {
-            const nextText = event.target.value;
-            setDraftValue(nextText);
+              const nextValue = Number.parseInt(nextText, 10);
+              if (Number.isNaN(nextValue)) {
+                return;
+              }
 
-            if (nextText.trim() === "") {
-              return;
-            }
-
-            const nextValue = Number.parseInt(nextText, 10);
-            if (Number.isNaN(nextValue)) {
-              return;
-            }
-
-            onChange(clamp(nextValue, min, max));
-          }}
-          className="h-8 border-0 bg-transparent text-center text-sm shadow-none [appearance:textfield] focus-visible:ring-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-        />
+              onChange(clamp(nextValue, min, max));
+            }}
+            className={cn(
+              "h-8 border-0 bg-transparent text-center text-sm shadow-none [appearance:textfield] focus-visible:ring-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+              suffix ? "pr-8" : undefined,
+            )}
+          />
+          {suffix && (
+            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-medium text-muted-foreground">
+              {suffix}
+            </span>
+          )}
+        </div>
         <Button
           type="button"
           variant="ghost"
