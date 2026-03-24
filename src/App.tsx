@@ -24,6 +24,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Eye,
   EyeOff,
+  Github,
   Moon,
   Play,
   RotateCcw,
@@ -321,9 +322,20 @@ function App() {
 
   const PrimaryIcon = primaryIcon;
   const currentAssignment = playerAssignments[currentPlayer - 1];
+  const githubRepoUrl = "https://github.com/freeeranger/imposter-game";
 
   return (
     <div className="relative box-border flex h-dvh min-h-dvh w-full items-center justify-center overflow-hidden bg-background p-4 transition-colors">
+      <a
+        href={githubRepoUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="absolute bottom-4 right-4 inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur transition-colors hover:bg-accent hover:text-accent-foreground md:bottom-6 md:right-6"
+        aria-label="Star freeeranger/imposter-game on GitHub"
+      >
+        <Github className="h-3.5 w-3.5" />
+        <span>Star on GitHub</span>
+      </a>
       <Button
         variant="outline"
         size="icon"
