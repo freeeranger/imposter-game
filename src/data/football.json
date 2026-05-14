@@ -1,0 +1,25 @@
+{
+  "name": "Football",
+  "wip": true,
+  "easy": [
+    "VAR",
+    "La Liga",
+    "Bundesliga",
+    "Allsvenskan",
+    "Premier League",
+    "Champions League",
+    "Barcelona",
+    "Real Madrid",
+    "Derby",
+    "Arsenal",
+    "Bayern München",
+    "WC"
+  ],
+  "hard": [
+    "Serie A",
+    "1981",
+    "Ultras",
+    "Jose Mourinho",
+    "Pep Guardiola"
+  ]
+}

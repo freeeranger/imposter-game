@@ -39,12 +39,14 @@ type CategoryFile = {
   name: string;
   easy: string[];
   hard: string[];
+  wip?: boolean;
 };
 
 type Category = {
   label: string;
   easy: string[];
   hard: string[];
+  wip: boolean;
 };
 
 const categoryFiles = import.meta.glob<{ default: CategoryFile }>(
@@ -56,10 +58,12 @@ const CATEGORIES: Record<string, Category> = Object.fromEntries(
   Object.entries(categoryFiles).map(([path, module]) => {
     const fileName = path.split("/").pop() ?? path;
     const key = fileName.replace(".json", "");
-    const { name, easy, hard } = module.default;
-    return [key, { label: name, easy, hard }];
+    const { name, easy, hard, wip } = module.default;
+    return [key, { label: name, easy, hard, wip: wip === true }];
   }),
 );
+
+const APP_VERSION = __APP_VERSION__;
 
 const CATEGORY_KEYS = Object.keys(CATEGORIES);
 const DEFAULT_CATEGORY = CATEGORY_KEYS[0] ?? "random";
@@ -78,7 +82,11 @@ const getCategoryWords = (category: Category, difficulty: Difficulty): string[] 
 
 type GameState = "setup" | "pass" | "reveal" | "end";
 type Theme = "light" | "dark";
-type PrankMode = "everyone-imposter" | "different-words" | "no-imposter";
+type PrankMode =
+  | "everyone-imposter"
+  | "different-words"
+  | "no-imposter"
+  | "two-imposters";
 type PlayerAssignment = {
   isImposter: boolean;
   word: string | null;
@@ -206,6 +214,10 @@ function App() {
         availablePranks.push("different-words");
       }
 
+      if (impostersCount === 1 && playersCount >= 3) {
+        availablePranks.push("two-imposters");
+      }
+
       const prankMode = pickRandom(availablePranks);
 
       if (prankMode === "everyone-imposter") {
@@ -220,6 +232,17 @@ function App() {
             isImposter: false,
             word,
           }));
+      } else if (prankMode === "two-imposters") {
+        const imposterIndices = new Set(
+          shuffle(
+            Array.from({ length: playersCount }, (_, index) => index),
+          ).slice(0, 2),
+        );
+        const sharedWord = pickRandom(categoryWords);
+        assignments = Array.from({ length: playersCount }, (_, index) => ({
+          isImposter: imposterIndices.has(index),
+          word: imposterIndices.has(index) ? null : sharedWord,
+        }));
       } else {
         const sharedWord = pickRandom(categoryWords);
         assignments = Array.from({ length: playersCount }, () => ({
@@ -336,6 +359,12 @@ function App() {
         <Github className="h-3.5 w-3.5" />
         <span>Star on GitHub</span>
       </a>
+      <span
+        className="absolute bottom-4 left-4 inline-flex items-center rounded-full border border-border/70 bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur md:bottom-6 md:left-6"
+        title={`Built ${APP_VERSION}`}
+      >
+        v{APP_VERSION}
+      </span>
       <Button
         variant="outline"
         size="icon"
@@ -388,8 +417,8 @@ function App() {
             </CardTitle>
             <CardDescription>Find the imposter among you.</CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 flex flex-col justify-center overflow-y-auto [scrollbar-gutter:stable]">
-            <div className="flex min-h-full flex-col justify-center">
+          <CardContent className="flex-1 overflow-y-auto [scrollbar-gutter:stable]">
+            <div className="flex min-h-full flex-col [justify-content:safe_center] py-2">
               <AnimatePresence
                 mode="wait"
                 initial={false}
@@ -472,7 +501,14 @@ function App() {
                             </SelectItem>
                             {Object.entries(CATEGORIES).map(([key, cat]) => (
                               <SelectItem key={key} value={key}>
-                                {cat.label}
+                                <span className="inline-flex items-center gap-2">
+                                  {cat.label}
+                                  {cat.wip && (
+                                    <span className="inline-flex shrink-0 items-center rounded-full bg-amber-500/15 px-1.5 py-1 text-xs font-semibold uppercase leading-none tracking-wider text-amber-600 dark:text-amber-400">
+                                      WIP
+                                    </span>
+                                  )}
+                                </span>
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -523,9 +559,14 @@ function App() {
                                 />
                                 <label
                                   htmlFor={`pool-${key}`}
-                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                  className="inline-flex items-center gap-1.5 text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                                 >
                                   {CATEGORIES[key].label}
+                                  {CATEGORIES[key].wip && (
+                                    <span className="inline-flex shrink-0 items-center rounded-full bg-amber-500/15 px-1.5 py-1 text-xs font-semibold uppercase leading-none tracking-wider text-amber-600 dark:text-amber-400">
+                                      WIP
+                                    </span>
+                                  )}
                                 </label>
                               </div>
                             ))}
