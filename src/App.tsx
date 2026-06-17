@@ -512,14 +512,14 @@ function App() {
         href={githubRepoUrl}
         target="_blank"
         rel="noreferrer"
-        className="absolute bottom-4 right-4 inline-flex items-center gap-2 border-2 border-border bg-background px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-muted-foreground shadow-brutal-sm transition-all hover:translate-x-0.5 hover:translate-y-0.5 hover:bg-accent hover:text-accent-foreground hover:shadow-none md:bottom-6 md:right-6"
+        className="absolute bottom-4 right-4 z-10 inline-flex items-center gap-2 border-2 border-border bg-background px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-muted-foreground shadow-brutal-sm transition-all hover:translate-x-0.5 hover:translate-y-0.5 hover:bg-accent hover:text-accent-foreground hover:shadow-none md:bottom-6 md:right-6"
         aria-label="Star freeeranger/imposter-game on GitHub"
       >
         <Github className="h-3.5 w-3.5" />
         <span>Star on GitHub</span>
       </a>
       <span
-        className="absolute bottom-4 left-4 inline-flex items-center border-2 border-border bg-background px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-muted-foreground shadow-brutal-sm md:bottom-6 md:left-6"
+        className="absolute bottom-4 left-4 z-10 inline-flex items-center border-2 border-border bg-background px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-muted-foreground shadow-brutal-sm md:bottom-6 md:left-6"
         title={`Built ${APP_VERSION}`}
       >
         v{APP_VERSION}
@@ -572,8 +572,8 @@ function App() {
         <Card
           className="flex w-full flex-col overflow-hidden"
           style={{
-            minHeight: "min(38rem, calc(100dvh - 4rem))",
-            maxHeight: "calc(100dvh - 4rem)",
+            minHeight: "min(38rem, calc(100dvh - 8rem))",
+            maxHeight: "calc(100dvh - 8rem)",
           }}
         >
           <CardHeader className="text-center">
