@@ -353,14 +353,14 @@ function App() {
         href={githubRepoUrl}
         target="_blank"
         rel="noreferrer"
-        className="absolute bottom-4 right-4 inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur transition-colors hover:bg-accent hover:text-accent-foreground md:bottom-6 md:right-6"
+        className="absolute bottom-4 right-4 inline-flex items-center gap-2 border-2 border-border bg-background px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-muted-foreground shadow-brutal-sm transition-all hover:translate-x-0.5 hover:translate-y-0.5 hover:bg-accent hover:text-accent-foreground hover:shadow-none md:bottom-6 md:right-6"
         aria-label="Star freeeranger/imposter-game on GitHub"
       >
         <Github className="h-3.5 w-3.5" />
         <span>Star on GitHub</span>
       </a>
       <span
-        className="absolute bottom-4 left-4 inline-flex items-center rounded-full border border-border/70 bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur md:bottom-6 md:left-6"
+        className="absolute bottom-4 left-4 inline-flex items-center border-2 border-border bg-background px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-muted-foreground shadow-brutal-sm md:bottom-6 md:left-6"
         title={`Built ${APP_VERSION}`}
       >
         v{APP_VERSION}
@@ -368,7 +368,7 @@ function App() {
       <Button
         variant="outline"
         size="icon"
-        className="absolute right-4 top-4 rounded-full md:right-6 md:top-6"
+        className="absolute right-4 top-4 z-10 md:right-6 md:top-6"
         onClick={() =>
           setTheme((currentTheme) =>
             currentTheme === "dark" ? "light" : "dark",
@@ -410,7 +410,13 @@ function App() {
         animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.22 } }}
         className="mx-auto flex h-full w-full max-w-md items-center"
       >
-        <Card className="flex min-h-[35rem] max-h-full w-full flex-col overflow-hidden rounded-lg shadow-lg">
+        <Card
+          className="flex w-full flex-col overflow-hidden"
+          style={{
+            minHeight: "min(38rem, calc(100dvh - 4rem))",
+            maxHeight: "calc(100dvh - 4rem)",
+          }}
+        >
           <CardHeader className="text-center">
             <CardTitle className="text-3xl font-bold tracking-tight">
               Imposter Game
@@ -460,7 +466,7 @@ function App() {
                           value={impostersCount}
                           onChange={setImpostersCount}
                           icon={Users}
-                          iconClassName="text-red-500"
+                          iconClassName="text-destructive"
                         />
                       </div>
                     </div>
@@ -477,7 +483,7 @@ function App() {
                           value={prankProbability}
                           onChange={setPrankProbability}
                           icon={VenetianMask}
-                          iconClassName="text-amber-500"
+                          iconClassName="text-primary"
                           suffix="%"
                         />
                       </div>
@@ -504,7 +510,7 @@ function App() {
                                 <span className="inline-flex items-center gap-2">
                                   {cat.label}
                                   {cat.wip && (
-                                    <span className="inline-flex shrink-0 items-center rounded-full bg-amber-500/15 px-1.5 py-1 text-xs font-semibold uppercase leading-none tracking-wider text-amber-600 dark:text-amber-400">
+                                    <span className="inline-flex shrink-0 items-center border border-border bg-muted px-1.5 py-0.5 text-[10px] font-bold uppercase leading-none tracking-widest text-muted-foreground">
                                       WIP
                                     </span>
                                   )}
@@ -537,7 +543,7 @@ function App() {
                       </div>
 
                       {selectedCategory === "random" && (
-                        <div className="space-y-3 rounded-lg border bg-muted/40 p-4">
+                        <div className="space-y-3 border-2 border-border bg-muted/40 p-4">
                           <Label className="text-sm text-muted-foreground block mb-2">
                             Include Categories:
                           </Label>
@@ -563,7 +569,7 @@ function App() {
                                 >
                                   {CATEGORIES[key].label}
                                   {CATEGORIES[key].wip && (
-                                    <span className="inline-flex shrink-0 items-center rounded-full bg-amber-500/15 px-1.5 py-1 text-xs font-semibold uppercase leading-none tracking-wider text-amber-600 dark:text-amber-400">
+                                    <span className="inline-flex shrink-0 items-center border border-border bg-muted px-1.5 py-0.5 text-[10px] font-bold uppercase leading-none tracking-widest text-muted-foreground">
                                       WIP
                                     </span>
                                   )}
@@ -575,7 +581,7 @@ function App() {
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between rounded-lg border p-4">
+                    <div className="flex items-center justify-between border-2 border-border p-4">
                       <div className="space-y-0.5">
                         <Label className="text-base">
                           Randomize Starting Player
@@ -603,10 +609,10 @@ function App() {
                     className="text-center space-y-8 py-6"
                   >
                     <div className="space-y-2">
-                      <h2 className="text-2xl font-semibold text-muted-foreground">
+                      <h2 className="text-2xl font-bold uppercase tracking-tight text-muted-foreground">
                         Pass device to
                       </h2>
-                      <p className="text-5xl font-bold text-primary">
+                      <p className="text-5xl font-bold uppercase tracking-tighter text-primary">
                         Player {currentPlayer}
                       </p>
                     </div>
@@ -626,13 +632,13 @@ function App() {
                     exit="exit"
                     className="text-center space-y-8 py-6"
                   >
-                    <h2 className="text-xl font-semibold text-muted-foreground">
+                    <h2 className="text-xl font-bold uppercase tracking-tight text-muted-foreground">
                       Player {currentPlayer}
                     </h2>
-                    <div className="rounded-lg bg-muted/60 p-8">
+                    <div className="border-2 border-border bg-muted p-8">
                       {currentAssignment?.isImposter ? (
                         <div className="space-y-2">
-                          <p className="text-4xl font-black text-red-500">
+                          <p className="text-4xl font-black uppercase tracking-tight text-destructive">
                             YOU ARE THE IMPOSTER
                           </p>
                           <p className="text-lg text-muted-foreground mt-4">
@@ -650,7 +656,7 @@ function App() {
                           <p className="text-sm uppercase tracking-wider font-semibold text-muted-foreground">
                             The Word Is
                           </p>
-                          <p className="text-4xl font-black text-primary">
+                          <p className="text-4xl font-black uppercase tracking-tight text-primary">
                             {currentAssignment?.word ?? "No word"}
                           </p>
                           <p className="text-lg text-muted-foreground mt-4">
@@ -676,7 +682,7 @@ function App() {
                     className="text-center space-y-8 py-6"
                   >
                     <div className="space-y-4">
-                      <h2 className="text-3xl font-bold text-primary">
+                      <h2 className="text-3xl font-bold uppercase tracking-tight text-primary">
                         Game Started!
                       </h2>
                       <p className="text-lg text-muted-foreground">
@@ -691,7 +697,7 @@ function App() {
                             y: 0,
                             transition: { duration: 0.16, delay: 0.03 },
                           }}
-                          className="mt-6 rounded-lg border border-primary/20 bg-primary/10 p-4"
+                          className="mt-6 border-2 border-border bg-primary/10 p-4"
                         >
                           <div className="flex items-center justify-center gap-2 mb-2">
                             <Shuffle className="w-5 h-5 text-primary" />
@@ -699,7 +705,7 @@ function App() {
                               Random Starter
                             </p>
                           </div>
-                          <p className="text-2xl font-bold text-foreground">
+                          <p className="text-2xl font-bold uppercase tracking-tight text-foreground">
                             Player {startingPlayer}
                           </p>
                           <p className="text-sm text-muted-foreground mt-1">
@@ -713,7 +719,7 @@ function App() {
               </AnimatePresence>
             </div>
           </CardContent>
-          <CardFooter className="shrink-0 border-t bg-card px-6 pb-6 pt-4">
+          <CardFooter className="shrink-0 border-t-2 border-border bg-card px-6 pb-6 pt-4">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={`footer-${panelKey}`}
@@ -724,7 +730,7 @@ function App() {
               >
                 <Button
                   onClick={primaryAction}
-                  className="h-14 w-full text-xl transition-transform duration-150 hover:scale-[1.01] active:scale-[0.99]"
+                  className="h-14 w-full text-xl"
                   size="lg"
                   variant={primaryVariant}
                   disabled={primaryDisabled}

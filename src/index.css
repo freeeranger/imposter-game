@@ -1,76 +1,125 @@
-@import "@fontsource/google-sans/latin-400.css";
-@import "@fontsource/google-sans/latin-500.css";
-@import "@fontsource/google-sans/latin-700.css";
-@import "@fontsource/google-sans/latin-ext-400.css";
-@import "@fontsource/google-sans/latin-ext-500.css";
-@import "@fontsource/google-sans/latin-ext-700.css";
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource-variable/space-grotesk";
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@custom-variant dark (&:is(.dark *));
+
+/*
+  Clean brutalist theme (ported from freeranger/ui).
+  - Near-monochrome paper/ink palette with one loud accent: violet.
+  - Sharp 0px corners, thick ink borders, hard offset shadows (no blur).
+  - Typeface: Space Grotesk.
+*/
+
+:root {
+  --radius: 0rem;
+
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+
+  /* violet ~ #c084fc (matches the Tjeneritz tile on the freeranger hub) */
+  --primary: #c084fc;
+  --primary-foreground: oklch(0.145 0 0);
+
+  --secondary: oklch(0.96 0 0);
+  --secondary-foreground: oklch(0.145 0 0);
+
+  --muted: oklch(0.96 0 0);
+  --muted-foreground: oklch(0.45 0 0);
+
+  --accent: oklch(0.95 0 0);
+  --accent-foreground: oklch(0.145 0 0);
+
+  --destructive: oklch(0.62 0.24 25);
+  --destructive-foreground: oklch(0.985 0 0);
+
+  /* hard ink hairlines everywhere */
+  --border: oklch(0.145 0 0);
+  --input: oklch(0.145 0 0);
+  --ring: oklch(0.145 0 0);
+
+  --brutal-shadow: oklch(0.145 0 0);
+}
+
+.dark {
+  --background: oklch(0.18 0 0);
+  --foreground: oklch(0.96 0 0);
+
+  --card: oklch(0.225 0 0);
+  --card-foreground: oklch(0.96 0 0);
+
+  --popover: oklch(0.225 0 0);
+  --popover-foreground: oklch(0.96 0 0);
+
+  --primary: #c084fc;
+  --primary-foreground: oklch(0.18 0 0);
+
+  --secondary: oklch(0.28 0 0);
+  --secondary-foreground: oklch(0.96 0 0);
+
+  --muted: oklch(0.28 0 0);
+  --muted-foreground: oklch(0.68 0 0);
+
+  --accent: oklch(0.3 0 0);
+  --accent-foreground: oklch(0.96 0 0);
+
+  --destructive: oklch(0.62 0.22 25);
+  --destructive-foreground: oklch(0.985 0 0);
+
+  /* calm gray borders + subtle gray offset shadows (not screaming white) */
+  --border: oklch(0.46 0 0);
+  --input: oklch(0.46 0 0);
+  --ring: oklch(0.62 0 0);
+
+  --brutal-shadow: oklch(0.42 0 0);
+}
+
+@theme inline {
+  --font-sans: "Space Grotesk Variable", ui-sans-serif, system-ui, sans-serif;
+
+  --radius-sm: 0rem;
+  --radius-md: 0rem;
+  --radius-lg: 0rem;
+  --radius-xl: 0rem;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* hard offset shadows — no blur, no spread */
+  --shadow-brutal-sm: 2px 2px 0 0 var(--brutal-shadow);
+  --shadow-brutal: 4px 4px 0 0 var(--brutal-shadow);
+  --shadow-brutal-md: 6px 6px 0 0 var(--brutal-shadow);
+  --shadow-brutal-lg: 8px 8px 0 0 var(--brutal-shadow);
+}
 
 @layer base {
   * {
-    @apply border-border;
+    @apply border-border outline-ring/50;
   }
-
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.85rem;
-  }
-  .dark {
-    --background: 222 24% 10%;
-    --foreground: 210 20% 92%;
-    --card: 222 21% 13%;
-    --card-foreground: 210 20% 92%;
-    --popover: 222 21% 13%;
-    --popover-foreground: 210 20% 92%;
-    --primary: 211 24% 76%;
-    --primary-foreground: 222 26% 14%;
-    --secondary: 223 17% 19%;
-    --secondary-foreground: 210 20% 92%;
-    --muted: 223 17% 19%;
-    --muted-foreground: 215 15% 74%;
-    --accent: 223 18% 23%;
-    --accent-foreground: 210 20% 96%;
-    --destructive: 0 70% 48%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 223 16% 20%;
-    --input: 223 16% 20%;
-    --ring: 214 24% 58%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-  }
-
   body {
-    @apply bg-background text-foreground antialiased;
-    font-family:
-      "Google Sans", "Google Sans Text", "Helvetica Neue", Arial, sans-serif;
+    @apply bg-background text-foreground font-sans antialiased;
   }
 }

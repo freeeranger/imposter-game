@@ -46,12 +46,12 @@ function NumberStepper({
       {Icon && (
         <Icon className={cn("h-5 w-5 text-muted-foreground", iconClassName)} />
       )}
-      <div className="flex flex-1 items-center gap-1 rounded-lg border bg-background p-1">
+      <div className="flex flex-1 items-center gap-1 border-2 border-border bg-background p-1">
         <Button
           type="button"
           variant="ghost"
           size="icon"
-          className="h-8 w-8 rounded-md"
+          className="h-8 w-8"
           onClick={() => updateValue(value - step)}
           disabled={value <= min}
           aria-label={`Decrease ${id}`}
@@ -105,7 +105,7 @@ function NumberStepper({
               onChange(clamp(nextValue, min, max));
             }}
             className={cn(
-              "h-8 border-0 bg-transparent text-center text-sm shadow-none [appearance:textfield] focus-visible:ring-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+              "h-8 border-0 bg-transparent text-center text-sm shadow-none [appearance:textfield] focus-visible:shadow-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
               suffix ? "pr-8" : undefined,
             )}
           />
@@ -119,7 +119,7 @@ function NumberStepper({
           type="button"
           variant="ghost"
           size="icon"
-          className="h-8 w-8 rounded-md"
+          className="h-8 w-8"
           onClick={() => updateValue(value + step)}
           disabled={value >= max}
           aria-label={`Increase ${id}`}
