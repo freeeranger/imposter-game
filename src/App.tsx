@@ -93,6 +93,98 @@ type PlayerAssignment = {
 };
 
 const THEME_STORAGE_KEY = "imposter-game-theme";
+const SETTINGS_STORAGE_KEY = "imposter-game-settings";
+
+type PersistedSettings = {
+  playersCount: number;
+  impostersCount: number;
+  selectedCategory: string;
+  selectedDifficulty: Difficulty;
+  randomizeStarter: boolean;
+  prankProbability: number;
+  revealFellowImposters: boolean;
+  randomPool: Record<string, boolean>;
+};
+
+const DEFAULT_SETTINGS: PersistedSettings = {
+  playersCount: 4,
+  impostersCount: 1,
+  selectedCategory: DEFAULT_CATEGORY,
+  selectedDifficulty: "all",
+  randomizeStarter: true,
+  prankProbability: 10,
+  revealFellowImposters: false,
+  randomPool: Object.fromEntries(CATEGORY_KEYS.map((key) => [key, true])),
+};
+
+function loadSettings(): PersistedSettings {
+  if (typeof window === "undefined") return DEFAULT_SETTINGS;
+  try {
+    const raw = window.localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (!raw) return DEFAULT_SETTINGS;
+    const parsed = JSON.parse(raw) as Partial<PersistedSettings>;
+    const clampInt = (
+      value: unknown,
+      min: number,
+      max: number,
+      fallback: number,
+    ) =>
+      typeof value === "number" && Number.isFinite(value)
+        ? Math.min(max, Math.max(min, Math.round(value)))
+        : fallback;
+    const players = clampInt(
+      parsed.playersCount,
+      3,
+      20,
+      DEFAULT_SETTINGS.playersCount,
+    );
+    const difficulty: Difficulty =
+      parsed.selectedDifficulty === "easy" ||
+      parsed.selectedDifficulty === "hard" ||
+      parsed.selectedDifficulty === "all"
+        ? parsed.selectedDifficulty
+        : DEFAULT_SETTINGS.selectedDifficulty;
+    const category =
+      parsed.selectedCategory === "random" ||
+      (typeof parsed.selectedCategory === "string" &&
+        CATEGORIES[parsed.selectedCategory])
+        ? parsed.selectedCategory
+        : DEFAULT_SETTINGS.selectedCategory;
+    return {
+      playersCount: players,
+      impostersCount: clampInt(
+        parsed.impostersCount,
+        1,
+        Math.max(1, players - 1),
+        DEFAULT_SETTINGS.impostersCount,
+      ),
+      selectedCategory: category,
+      selectedDifficulty: difficulty,
+      randomizeStarter:
+        typeof parsed.randomizeStarter === "boolean"
+          ? parsed.randomizeStarter
+          : DEFAULT_SETTINGS.randomizeStarter,
+      prankProbability: clampInt(
+        parsed.prankProbability,
+        0,
+        100,
+        DEFAULT_SETTINGS.prankProbability,
+      ),
+      revealFellowImposters:
+        typeof parsed.revealFellowImposters === "boolean"
+          ? parsed.revealFellowImposters
+          : DEFAULT_SETTINGS.revealFellowImposters,
+      randomPool: {
+        ...DEFAULT_SETTINGS.randomPool,
+        ...(parsed.randomPool && typeof parsed.randomPool === "object"
+          ? parsed.randomPool
+          : {}),
+      },
+    };
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+}
 const PANEL_TRANSITION = { duration: 0.2, ease: [0.22, 1, 0.36, 1] as const };
 const PANEL_VARIANTS = {
   initial: (direction: number) => ({
@@ -144,19 +236,33 @@ function App() {
       ? "dark"
       : "light";
   });
+  const [settings] = useState(loadSettings);
   const [gameState, setGameState] = useState<GameState>("setup");
-  const [playersCount, setPlayersCount] = useState<number>(4);
-  const [impostersCount, setImpostersCount] = useState<number>(1);
-  const [selectedCategory, setSelectedCategory] = useState<string | "random">(
-    DEFAULT_CATEGORY,
+  const [playersCount, setPlayersCount] = useState<number>(
+    settings.playersCount,
   );
-  const [selectedDifficulty, setSelectedDifficulty] =
-    useState<Difficulty>("all");
-  const [randomizeStarter, setRandomizeStarter] = useState<boolean>(true);
-  const [prankProbability, setPrankProbability] = useState<number>(10);
+  const [impostersCount, setImpostersCount] = useState<number>(
+    settings.impostersCount,
+  );
+  const [selectedCategory, setSelectedCategory] = useState<string | "random">(
+    settings.selectedCategory,
+  );
+  const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>(
+    settings.selectedDifficulty,
+  );
+  const [randomizeStarter, setRandomizeStarter] = useState<boolean>(
+    settings.randomizeStarter,
+  );
+  const [prankProbability, setPrankProbability] = useState<number>(
+    settings.prankProbability,
+  );
+  const [revealFellowImposters, setRevealFellowImposters] = useState<boolean>(
+    settings.revealFellowImposters,
+  );
+  const [prankActive, setPrankActive] = useState<boolean>(false);
 
   const [randomPool, setRandomPool] = useState<Record<string, boolean>>(
-    Object.fromEntries(CATEGORY_KEYS.map((key) => [key, true])),
+    settings.randomPool,
   );
 
   const [playerAssignments, setPlayerAssignments] = useState<PlayerAssignment[]>(
@@ -173,6 +279,35 @@ function App() {
     document.documentElement.classList.toggle("dark", theme === "dark");
     window.localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        SETTINGS_STORAGE_KEY,
+        JSON.stringify({
+          playersCount,
+          impostersCount,
+          selectedCategory,
+          selectedDifficulty,
+          randomizeStarter,
+          prankProbability,
+          revealFellowImposters,
+          randomPool,
+        } satisfies PersistedSettings),
+      );
+    } catch {
+      // ignore storage write errors (e.g. private mode)
+    }
+  }, [
+    playersCount,
+    impostersCount,
+    selectedCategory,
+    selectedDifficulty,
+    randomizeStarter,
+    prankProbability,
+    revealFellowImposters,
+    randomPool,
+  ]);
 
   const startGame = () => {
     if (playersCount < 3) return; // Need at least 3 players
@@ -268,6 +403,7 @@ function App() {
     setPlayerAssignments(assignments);
     setActiveCategory(chosenCategory);
     setCurrentPlayer(1);
+    setPrankActive(shouldUsePrank);
 
     if (randomizeStarter) {
       setStartingPlayer(Math.floor(Math.random() * playersCount) + 1);
@@ -297,6 +433,17 @@ function App() {
   const resetToSetup = () => {
     setTransitionDirection(-1);
     setGameState("setup");
+  };
+
+  const resetSettings = () => {
+    setPlayersCount(DEFAULT_SETTINGS.playersCount);
+    setImpostersCount(DEFAULT_SETTINGS.impostersCount);
+    setSelectedCategory(DEFAULT_SETTINGS.selectedCategory);
+    setSelectedDifficulty(DEFAULT_SETTINGS.selectedDifficulty);
+    setRandomizeStarter(DEFAULT_SETTINGS.randomizeStarter);
+    setPrankProbability(DEFAULT_SETTINGS.prankProbability);
+    setRevealFellowImposters(DEFAULT_SETTINGS.revealFellowImposters);
+    setRandomPool({ ...DEFAULT_SETTINGS.randomPool });
   };
 
   const hasCategories = CATEGORY_KEYS.length > 0;
@@ -346,6 +493,18 @@ function App() {
   const PrimaryIcon = primaryIcon;
   const currentAssignment = playerAssignments[currentPlayer - 1];
   const githubRepoUrl = "https://github.com/freeeranger/imposter-game";
+
+  const imposterNumbers = playerAssignments
+    .map((assignment, index) => (assignment.isImposter ? index + 1 : null))
+    .filter((value): value is number => value !== null);
+  const showFellowImposters =
+    revealFellowImposters &&
+    !prankActive &&
+    (currentAssignment?.isImposter ?? false) &&
+    imposterNumbers.length >= 2;
+  const fellowImposters = showFellowImposters
+    ? imposterNumbers.filter((number) => number !== currentPlayer)
+    : [];
 
   return (
     <div className="relative box-border flex h-dvh min-h-dvh w-full items-center justify-center overflow-hidden bg-background p-4 transition-colors">
@@ -595,6 +754,35 @@ function App() {
                         onCheckedChange={setRandomizeStarter}
                       />
                     </div>
+
+                    {impostersCount >= 2 && (
+                      <div className="flex items-center justify-between border-2 border-border p-4">
+                        <div className="space-y-0.5">
+                          <Label className="text-base">
+                            Imposters Know Each Other
+                          </Label>
+                          <p className="text-sm text-muted-foreground">
+                            Each imposter is shown who the others are.
+                          </p>
+                        </div>
+                        <Switch
+                          checked={revealFellowImposters}
+                          onCheckedChange={setRevealFellowImposters}
+                        />
+                      </div>
+                    )}
+
+                    <div className="flex justify-center pt-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={resetSettings}
+                      >
+                        <RotateCcw />
+                        Reset settings
+                      </Button>
+                    </div>
                   </motion.div>
                 )}
 
@@ -650,6 +838,20 @@ function App() {
                           <p className="text-sm text-muted-foreground mt-2">
                             Try to blend in with the rest of the table.
                           </p>
+                          {fellowImposters.length > 0 && (
+                            <div className="mt-4 border-2 border-border bg-background p-3">
+                              <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+                                {fellowImposters.length === 1
+                                  ? "Your fellow imposter"
+                                  : "Your fellow imposters"}
+                              </p>
+                              <p className="mt-1 text-lg font-bold uppercase tracking-tight text-destructive">
+                                {fellowImposters
+                                  .map((number) => `Player ${number}`)
+                                  .join(" · ")}
+                              </p>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="space-y-2">
