@@ -46,7 +46,7 @@ function NumberStepper({
       {Icon && (
         <Icon className={cn("h-5 w-5 text-muted-foreground", iconClassName)} />
       )}
-      <div className="flex flex-1 items-center gap-1 border-2 border-border bg-background p-1">
+      <div className="flex flex-1 items-center gap-1 border-2 border-border bg-background p-1 transition-[box-shadow] focus-within:shadow-brutal-sm">
         <Button
           type="button"
           variant="ghost"
@@ -105,7 +105,7 @@ function NumberStepper({
               onChange(clamp(nextValue, min, max));
             }}
             className={cn(
-              "h-8 border-0 bg-transparent text-center text-sm shadow-none [appearance:textfield] focus-visible:shadow-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+              "h-8 border-0 bg-transparent text-center text-base md:text-sm shadow-none [appearance:textfield] focus-visible:shadow-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
               suffix ? "pr-8" : undefined,
             )}
           />

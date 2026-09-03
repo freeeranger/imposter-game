@@ -22,9 +22,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { AnimatePresence, motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 import {
+  ExternalLink,
   Eye,
   EyeOff,
   Github,
+  Info,
   Moon,
   Play,
   RotateCcw,
@@ -32,8 +34,10 @@ import {
   Sun,
   Users,
   VenetianMask,
+  X,
 } from "lucide-react";
 import type { ButtonProps } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 type CategoryFile = {
   name: string;
@@ -274,6 +278,7 @@ function App() {
   const [currentPlayer, setCurrentPlayer] = useState<number>(1);
   const [startingPlayer, setStartingPlayer] = useState<number | null>(null);
   const [transitionDirection, setTransitionDirection] = useState<1 | -1>(1);
+  const [showInfoModal, setShowInfoModal] = useState<boolean>(false);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -480,7 +485,7 @@ function App() {
   } else if (gameState === "reveal") {
     primaryLabel = "Hide & Next";
     primaryIcon = EyeOff;
-    primaryVariant = "secondary";
+    primaryVariant = "default";
     primaryDisabled = false;
     primaryAction = nextTurn;
   } else if (gameState === "end") {
@@ -508,81 +513,79 @@ function App() {
 
   return (
     <div className="relative box-border flex h-dvh min-h-dvh w-full items-center justify-center overflow-hidden bg-background p-4 transition-colors">
-      <a
-        href={githubRepoUrl}
-        target="_blank"
-        rel="noreferrer"
-        className="absolute bottom-4 right-4 z-10 inline-flex items-center gap-2 border-2 border-border bg-background px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-muted-foreground shadow-brutal-sm transition-all hover:translate-x-0.5 hover:translate-y-0.5 hover:bg-accent hover:text-accent-foreground hover:shadow-none md:bottom-6 md:right-6"
-        aria-label="Star freeeranger/imposter-game on GitHub"
-      >
-        <Github className="h-3.5 w-3.5" />
-        <span>Star on GitHub</span>
-      </a>
-      <span
-        className="absolute bottom-4 left-4 z-10 inline-flex items-center border-2 border-border bg-background px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-muted-foreground shadow-brutal-sm md:bottom-6 md:left-6"
-        title={`Built ${APP_VERSION}`}
-      >
-        v{APP_VERSION}
-      </span>
-      <Button
-        variant="outline"
-        size="icon"
-        className="absolute right-4 top-4 z-10 md:right-6 md:top-6"
-        onClick={() =>
-          setTheme((currentTheme) =>
-            currentTheme === "dark" ? "light" : "dark",
-          )
-        }
-        aria-label={
-          theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
-        }
-      >
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.span
-            key={theme}
-            initial={{ opacity: 0, rotate: -35, scale: 0.8 }}
-            animate={{
-              opacity: 1,
-              rotate: 0,
-              scale: 1,
-              transition: { duration: 0.16 },
-            }}
-            exit={{
-              opacity: 0,
-              rotate: 35,
-              scale: 0.8,
-              transition: { duration: 0.12 },
-            }}
-            className="inline-flex"
-          >
-            {theme === "dark" ? (
-              <Sun className="h-5 w-5" />
-            ) : (
-              <Moon className="h-5 w-5" />
-            )}
-          </motion.span>
-        </AnimatePresence>
-      </Button>
+      <div className="absolute right-4 top-4 z-20 flex items-center gap-2 md:right-6 md:top-6">
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-9 w-9 border-2"
+          onClick={() => setShowInfoModal(true)}
+          aria-label="Game information & rules"
+        >
+          <Info className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-9 w-9 border-2"
+          onClick={() =>
+            setTheme((currentTheme) =>
+              currentTheme === "dark" ? "light" : "dark",
+            )
+          }
+          aria-label={
+            theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+          }
+        >
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.span
+              key={theme}
+              initial={{ opacity: 0, rotate: -35, scale: 0.8 }}
+              animate={{
+                opacity: 1,
+                rotate: 0,
+                scale: 1,
+                transition: { duration: 0.16 },
+              }}
+              exit={{
+                opacity: 0,
+                rotate: 35,
+                scale: 0.8,
+                transition: { duration: 0.12 },
+              }}
+              className="inline-flex"
+            >
+              {theme === "dark" ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
+            </motion.span>
+          </AnimatePresence>
+        </Button>
+      </div>
 
       <motion.div
         initial={{ opacity: 0, y: 10, scale: 0.99 }}
         animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.22 } }}
-        className="mx-auto flex h-full w-full max-w-md items-center"
+        className="mx-auto flex h-full w-full max-w-md items-center justify-center"
       >
         <Card
-          className="flex w-full flex-col overflow-hidden"
-          style={{
-            minHeight: "min(38rem, calc(100dvh - 8rem))",
-            maxHeight: "calc(100dvh - 8rem)",
-          }}
+          className={cn(
+            "flex w-full flex-col overflow-hidden shadow-brutal transition-all duration-200",
+            gameState === "setup"
+              ? "max-h-[calc(100dvh-5.5rem)] md:max-h-[calc(100dvh-6.5rem)]"
+              : "min-h-[22rem] md:min-h-[26rem]",
+          )}
         >
-          <CardHeader className="text-center">
-            <CardTitle className="text-3xl font-bold tracking-tight">
+          <CardHeader className="text-center pb-2 pt-6 shrink-0">
+            <CardTitle className="text-2xl md:text-3xl font-black tracking-tight">
               Imposter Game
             </CardTitle>
-            <CardDescription>Find the imposter among you.</CardDescription>
+            <CardDescription className="text-xs uppercase tracking-wider">
+              Find the imposter among you
+            </CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto [scrollbar-gutter:stable]">
+          <CardContent className="flex-1 overflow-y-auto overscroll-contain px-6 py-2">
             <div className="flex min-h-full flex-col [justify-content:safe_center] py-2">
               <AnimatePresence
                 mode="wait"
@@ -599,9 +602,15 @@ function App() {
                     exit="exit"
                     className="space-y-6"
                   >
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="players">Players</Label>
+                    <div className="grid grid-cols-2 gap-3.5">
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="players"
+                          className="inline-flex items-center gap-1.5"
+                        >
+                          <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span>Players</span>
+                        </Label>
                         <NumberStepper
                           id="players"
                           min={3}
@@ -613,27 +622,34 @@ function App() {
                               setImpostersCount(Math.max(1, value - 1));
                             }
                           }}
-                          icon={Users}
                         />
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="imposters">Imposters</Label>
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="imposters"
+                          className="inline-flex items-center gap-1.5"
+                        >
+                          <Users className="h-3.5 w-3.5 text-destructive" />
+                          <span>Imposters</span>
+                        </Label>
                         <NumberStepper
                           id="imposters"
                           min={1}
                           max={playersCount - 1}
                           value={impostersCount}
                           onChange={setImpostersCount}
-                          icon={Users}
-                          iconClassName="text-destructive"
                         />
                       </div>
                     </div>
 
                     <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="prank-probability">
-                          Prank Probability
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="prank-probability"
+                          className="inline-flex items-center gap-1.5"
+                        >
+                          <VenetianMask className="h-3.5 w-3.5 text-primary" />
+                          <span>Prank Probability</span>
                         </Label>
                         <NumberStepper
                           id="prank-probability"
@@ -641,8 +657,6 @@ function App() {
                           max={100}
                           value={prankProbability}
                           onChange={setPrankProbability}
-                          icon={VenetianMask}
-                          iconClassName="text-primary"
                           suffix="%"
                         />
                       </div>
@@ -702,70 +716,117 @@ function App() {
                       </div>
 
                       {selectedCategory === "random" && (
-                        <div className="space-y-3 border-2 border-border bg-muted/40 p-4">
-                          <Label className="text-sm text-muted-foreground block mb-2">
-                            Include Categories:
-                          </Label>
-                          <div className="grid grid-cols-2 gap-3">
-                            {CATEGORY_KEYS.map((key) => (
-                              <div
-                                key={key}
-                                className="flex items-center space-x-2"
+                        <div className="space-y-2.5 border-2 border-border bg-muted/30 p-3.5">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                              Include Categories
+                            </Label>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setRandomPool(
+                                    Object.fromEntries(
+                                      CATEGORY_KEYS.map((k) => [k, true]),
+                                    ),
+                                  )
+                                }
+                                className="text-[11px] font-bold uppercase tracking-wider text-primary hover:underline cursor-pointer"
                               >
-                                <Checkbox
-                                  id={`pool-${key}`}
-                                  checked={randomPool[key]}
-                                  onCheckedChange={(checked) =>
-                                    setRandomPool((prev) => ({
-                                      ...prev,
-                                      [key]: checked === true,
-                                    }))
-                                  }
-                                />
+                                All
+                              </button>
+                              <span className="text-muted-foreground text-xs">
+                                /
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setRandomPool(
+                                    Object.fromEntries(
+                                      CATEGORY_KEYS.map((k) => [k, false]),
+                                    ),
+                                  )
+                                }
+                                className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground hover:underline cursor-pointer"
+                              >
+                                None
+                              </button>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                            {CATEGORY_KEYS.map((key) => {
+                              const isChecked = !!randomPool[key];
+                              return (
                                 <label
+                                  key={key}
                                   htmlFor={`pool-${key}`}
-                                  className="inline-flex items-center gap-1.5 text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                  className={cn(
+                                    "flex items-center gap-2 border border-border p-2 text-xs font-medium cursor-pointer transition-colors select-none",
+                                    isChecked
+                                      ? "bg-background text-foreground shadow-brutal-sm"
+                                      : "bg-muted/60 text-muted-foreground opacity-60 hover:opacity-100",
+                                  )}
                                 >
-                                  {CATEGORIES[key].label}
+                                  <Checkbox
+                                    id={`pool-${key}`}
+                                    checked={isChecked}
+                                    onCheckedChange={(checked) =>
+                                      setRandomPool((prev) => ({
+                                        ...prev,
+                                        [key]: checked === true,
+                                      }))
+                                    }
+                                  />
+                                  <span className="truncate flex-1 font-semibold">
+                                    {CATEGORIES[key].label}
+                                  </span>
                                   {CATEGORIES[key].wip && (
-                                    <span className="inline-flex shrink-0 items-center border border-border bg-muted px-1.5 py-0.5 text-[10px] font-bold uppercase leading-none tracking-widest text-muted-foreground">
+                                    <span className="shrink-0 border border-border bg-muted px-1 py-0.5 text-[9px] font-bold uppercase leading-none text-muted-foreground">
                                       WIP
                                     </span>
                                   )}
                                 </label>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between border-2 border-border p-4">
-                      <div className="space-y-0.5">
-                        <Label className="text-base">
+                    <div className="flex items-center justify-between border-2 border-border p-3.5 bg-background shadow-brutal-sm">
+                      <div className="space-y-0.5 pr-3">
+                        <Label
+                          htmlFor="randomize-starter"
+                          className="text-sm font-bold tracking-tight normal-case cursor-pointer"
+                        >
                           Randomize Starting Player
                         </Label>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-xs text-muted-foreground leading-relaxed">
                           Randomly picks someone to speak first.
                         </p>
                       </div>
                       <Switch
+                        id="randomize-starter"
                         checked={randomizeStarter}
                         onCheckedChange={setRandomizeStarter}
                       />
                     </div>
 
                     {impostersCount >= 2 && (
-                      <div className="flex items-center justify-between border-2 border-border p-4">
-                        <div className="space-y-0.5">
-                          <Label className="text-base">
+                      <div className="flex items-center justify-between border-2 border-border p-3.5 bg-background shadow-brutal-sm">
+                        <div className="space-y-0.5 pr-3">
+                          <Label
+                            htmlFor="fellow-imposters"
+                            className="text-sm font-bold tracking-tight normal-case cursor-pointer"
+                          >
                             Imposters Know Each Other
                           </Label>
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-xs text-muted-foreground leading-relaxed">
                             Each imposter is shown who the others are.
                           </p>
                         </div>
                         <Switch
+                          id="fellow-imposters"
                           checked={revealFellowImposters}
                           onCheckedChange={setRevealFellowImposters}
                         />
@@ -778,8 +839,9 @@ function App() {
                         variant="ghost"
                         size="sm"
                         onClick={resetSettings}
+                        className="text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground"
                       >
-                        <RotateCcw />
+                        <RotateCcw className="h-3.5 w-3.5 mr-1" />
                         Reset settings
                       </Button>
                     </div>
@@ -794,19 +856,25 @@ function App() {
                     initial="initial"
                     animate="animate"
                     exit="exit"
-                    className="text-center space-y-8 py-6"
+                    className="text-center space-y-6 py-4"
                   >
-                    <div className="space-y-2">
-                      <h2 className="text-2xl font-bold uppercase tracking-tight text-muted-foreground">
+                    <div className="inline-flex items-center gap-1.5 border border-border bg-muted px-3 py-1 text-xs font-bold uppercase tracking-widest text-muted-foreground select-none">
+                      <span>
+                        Player {currentPlayer} of {playersCount}
+                      </span>
+                    </div>
+                    <div className="space-y-1.5">
+                      <h2 className="text-xl font-bold uppercase tracking-tight text-muted-foreground">
                         Pass device to
                       </h2>
-                      <p className="text-5xl font-bold uppercase tracking-tighter text-primary">
+                      <p className="text-5xl font-black uppercase tracking-tighter text-primary">
                         Player {currentPlayer}
                       </p>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      Make sure no one else is looking at the screen.
-                    </p>
+                    <div className="border-2 border-border bg-muted/60 p-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-center gap-2 select-none">
+                      <EyeOff className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span>Keep screen hidden until you hold the phone</span>
+                    </div>
                   </motion.div>
                 )}
 
@@ -818,34 +886,43 @@ function App() {
                     initial="initial"
                     animate="animate"
                     exit="exit"
-                    className="text-center space-y-8 py-6"
+                    className="text-center space-y-4 py-2"
                   >
-                    <h2 className="text-xl font-bold uppercase tracking-tight text-muted-foreground">
-                      Player {currentPlayer}
-                    </h2>
-                    <div className="border-2 border-border bg-muted p-8">
+                    <div className="inline-flex items-center gap-1.5 border border-border bg-muted px-3 py-1 text-xs font-bold uppercase tracking-widest text-muted-foreground select-none">
+                      <span>
+                        Player {currentPlayer} of {playersCount}
+                      </span>
+                    </div>
+                    <div className="border-2 border-border bg-card p-5 shadow-brutal-sm">
                       {currentAssignment?.isImposter ? (
-                        <div className="space-y-2">
-                          <p className="text-4xl font-black uppercase tracking-tight text-destructive">
-                            YOU ARE THE IMPOSTER
-                          </p>
-                          <p className="text-lg text-muted-foreground mt-4">
-                            Category:{" "}
-                            <span className="font-semibold text-foreground">
+                        <div className="space-y-3.5">
+                          <div className="border-2 border-destructive bg-destructive/10 p-4">
+                            <p className="text-xs font-bold uppercase tracking-widest text-destructive">
+                              Secret Role
+                            </p>
+                            <p className="text-3xl md:text-4xl font-black uppercase tracking-tight text-destructive mt-1">
+                              YOU ARE THE IMPOSTER
+                            </p>
+                          </div>
+                          <div className="border border-border bg-muted/50 p-2.5">
+                            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                              Category
+                            </p>
+                            <p className="text-lg font-bold text-foreground">
                               {CATEGORIES[activeCategory]?.label}
-                            </span>
-                          </p>
-                          <p className="text-sm text-muted-foreground mt-2">
-                            Try to blend in with the rest of the table.
+                            </p>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Try to blend in with the rest of the table. Listen carefully before you speak!
                           </p>
                           {fellowImposters.length > 0 && (
-                            <div className="mt-4 border-2 border-border bg-background p-3">
+                            <div className="mt-3 border-2 border-border bg-background p-3">
                               <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
                                 {fellowImposters.length === 1
                                   ? "Your fellow imposter"
                                   : "Your fellow imposters"}
                               </p>
-                              <p className="mt-1 text-lg font-bold uppercase tracking-tight text-destructive">
+                              <p className="mt-1 text-base font-bold uppercase tracking-tight text-destructive">
                                 {fellowImposters
                                   .map((number) => `Player ${number}`)
                                   .join(" · ")}
@@ -854,18 +931,25 @@ function App() {
                           )}
                         </div>
                       ) : (
-                        <div className="space-y-2">
-                          <p className="text-sm uppercase tracking-wider font-semibold text-muted-foreground">
-                            The Word Is
-                          </p>
-                          <p className="text-4xl font-black uppercase tracking-tight text-primary">
-                            {currentAssignment?.word ?? "No word"}
-                          </p>
-                          <p className="text-lg text-muted-foreground mt-4">
-                            Category:{" "}
-                            <span className="font-semibold text-foreground">
+                        <div className="space-y-3.5">
+                          <div className="border-2 border-primary bg-primary/10 p-4">
+                            <p className="text-xs font-bold uppercase tracking-widest text-primary">
+                              The Word Is
+                            </p>
+                            <p className="text-3xl md:text-4xl font-black uppercase tracking-tight text-foreground mt-1">
+                              {currentAssignment?.word ?? "No word"}
+                            </p>
+                          </div>
+                          <div className="border border-border bg-muted/50 p-2.5">
+                            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                              Category
+                            </p>
+                            <p className="text-lg font-bold text-foreground">
                               {CATEGORIES[activeCategory]?.label}
-                            </span>
+                            </p>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Give a subtle clue to prove you know the word without giving it away!
                           </p>
                         </div>
                       )}
@@ -881,47 +965,49 @@ function App() {
                     initial="initial"
                     animate="animate"
                     exit="exit"
-                    className="text-center space-y-8 py-6"
+                    className="text-center space-y-6 py-4"
                   >
-                    <div className="space-y-4">
-                      <h2 className="text-3xl font-bold uppercase tracking-tight text-primary">
+                    <div className="space-y-3">
+                      <div className="inline-flex items-center justify-center p-3 border-2 border-border bg-primary/15 shadow-brutal-sm mx-auto select-none">
+                        <VenetianMask className="h-7 w-7 text-primary" />
+                      </div>
+                      <h2 className="text-3xl font-black uppercase tracking-tight text-primary">
                         Game Started!
                       </h2>
-                      <p className="text-lg text-muted-foreground">
-                        Everyone has seen their role. Start discussing and
-                        figure out what is going on this round.
+                      <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                        Everyone has seen their role. Start discussing and figure out who is bluffing this round!
                       </p>
-                      {startingPlayer && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 6 }}
-                          animate={{
-                            opacity: 1,
-                            y: 0,
-                            transition: { duration: 0.16, delay: 0.03 },
-                          }}
-                          className="mt-6 border-2 border-border bg-primary/10 p-4"
-                        >
-                          <div className="flex items-center justify-center gap-2 mb-2">
-                            <Shuffle className="w-5 h-5 text-primary" />
-                            <p className="text-sm font-semibold uppercase tracking-wider text-primary">
-                              Random Starter
-                            </p>
-                          </div>
-                          <p className="text-2xl font-bold uppercase tracking-tight text-foreground">
-                            Player {startingPlayer}
-                          </p>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            goes first this round!
-                          </p>
-                        </motion.div>
-                      )}
                     </div>
+                    {startingPlayer && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{
+                          opacity: 1,
+                          y: 0,
+                          transition: { duration: 0.16, delay: 0.03 },
+                        }}
+                        className="mt-6 border-2 border-border bg-primary/10 p-4 shadow-brutal-sm"
+                      >
+                        <div className="flex items-center justify-center gap-2 mb-2">
+                          <Shuffle className="w-5 h-5 text-primary" />
+                          <p className="text-xs font-bold uppercase tracking-wider text-primary">
+                            Random Starter
+                          </p>
+                        </div>
+                        <p className="text-2xl font-black uppercase tracking-tight text-foreground">
+                          Player {startingPlayer}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          goes first this round!
+                        </p>
+                      </motion.div>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
           </CardContent>
-          <CardFooter className="shrink-0 border-t-2 border-border bg-card px-6 pb-6 pt-4">
+          <CardFooter className="shrink-0 flex-col border-t-2 border-border bg-card px-6 pb-6 pt-4">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={`footer-${panelKey}`}
@@ -940,11 +1026,97 @@ function App() {
                   <PrimaryIcon className="mr-2 h-6 w-6" />
                   {primaryLabel}
                 </Button>
+                {gameState === "setup" && primaryDisabled && (
+                  <p className="mt-2 text-center text-xs font-bold uppercase tracking-wider text-destructive">
+                    {impostersCount >= playersCount
+                      ? "Imposters must be fewer than players"
+                      : "Select at least one category to start"}
+                  </p>
+                )}
               </motion.div>
             </AnimatePresence>
           </CardFooter>
         </Card>
       </motion.div>
+
+      {/* Info & Rules Modal */}
+      <AnimatePresence>
+        {showInfoModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-background/80 backdrop-blur-xs"
+              onClick={() => setShowInfoModal(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 8 }}
+              className="relative z-10 w-full max-w-sm border-2 border-border bg-card p-6 shadow-brutal-lg text-foreground space-y-5"
+            >
+              <div className="flex items-center justify-between border-b-2 border-border pb-3">
+                <div className="flex items-center gap-2">
+                  <VenetianMask className="h-5 w-5 text-primary" />
+                  <h3 className="font-black uppercase tracking-tight text-lg">
+                    Imposter Game
+                  </h3>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowInfoModal(false)}
+                  aria-label="Close modal"
+                  className="h-8 w-8"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <div className="space-y-3 text-xs text-muted-foreground">
+                <p className="font-bold uppercase tracking-wider text-foreground">
+                  How to play
+                </p>
+                <div className="space-y-2 leading-relaxed">
+                  <p>
+                    Pass the phone around so everyone can check their card in private.
+                  </p>
+                  <p>
+                    Most players see a secret word. The imposter only sees the category.
+                  </p>
+                  <p>
+                    Go around the room and say one clue each. Too obvious, and the imposter catches on. Too vague, and everyone votes you out.
+                  </p>
+                  <p>
+                    Once everyone has spoken, argue and point fingers.
+                  </p>
+                </div>
+              </div>
+
+              <div className="border-t-2 border-border pt-4 flex flex-col gap-2.5 text-xs">
+                <a
+                  href={githubRepoUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center justify-between border-2 border-border bg-muted p-2.5 font-bold uppercase tracking-wider text-foreground shadow-brutal-sm hover:bg-accent transition-colors select-none"
+                >
+                  <span className="flex items-center gap-2">
+                    <Github className="h-4 w-4" />
+                    <span>Star on GitHub</span>
+                  </span>
+                  <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                </a>
+
+                <div className="flex items-center justify-between text-muted-foreground font-mono text-[11px] px-1 pt-1 select-none">
+                  <span>tjeneritz.se</span>
+                  <span>v{APP_VERSION}</span>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
