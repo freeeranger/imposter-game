@@ -597,8 +597,8 @@ function App() {
               Pass the phone and spot the liar
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto overscroll-contain px-6 py-2">
-            <div className="flex min-h-full flex-col justify-center py-2">
+          <CardContent className="flex flex-1 flex-col min-h-0 overflow-y-auto overscroll-contain px-6 py-2">
+            <div className="my-auto flex w-full flex-col justify-center py-2">
               <AnimatePresence
                 mode="wait"
                 initial={false}
@@ -612,7 +612,7 @@ function App() {
                     initial="initial"
                     animate="animate"
                     exit="exit"
-                    className="space-y-6 my-auto"
+                    className="w-full space-y-6 my-auto"
                   >
                     <div className="grid grid-cols-2 gap-3.5">
                       <div className="space-y-1.5">
@@ -728,7 +728,7 @@ function App() {
                       </div>
 
                       {selectedCategory === "random" && (
-                        <div className="space-y-2.5 border-2 border-border bg-muted/30 p-3.5">
+                        <div className="space-y-2.5 bg-muted/30 p-3.5">
                           <div className="flex items-center justify-between">
                             <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                               Include Categories
@@ -805,7 +805,7 @@ function App() {
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between border-2 border-border p-3.5 bg-background shadow-brutal-sm">
+                    <div className="flex items-center justify-between p-3.5 bg-muted/40 transition-colors">
                       <div className="space-y-0.5 pr-3">
                         <Label
                           htmlFor="randomize-starter"
@@ -825,7 +825,7 @@ function App() {
                     </div>
 
                     {impostersCount >= 2 && (
-                      <div className="flex items-center justify-between border-2 border-border p-3.5 bg-background shadow-brutal-sm">
+                      <div className="flex items-center justify-between p-3.5 bg-muted/40 transition-colors">
                         <div className="space-y-0.5 pr-3">
                           <Label
                             htmlFor="fellow-imposters"
@@ -868,7 +868,7 @@ function App() {
                     initial="initial"
                     animate="animate"
                     exit="exit"
-                    className="text-center space-y-6 py-4 my-auto"
+                    className="w-full text-center space-y-6 py-4 my-auto"
                   >
                     <div className="inline-flex items-center gap-1.5 border border-border bg-muted px-3 py-1 text-xs font-bold uppercase tracking-widest text-muted-foreground select-none">
                       <span>
@@ -897,7 +897,7 @@ function App() {
                     initial="initial"
                     animate="animate"
                     exit="exit"
-                    className="text-center space-y-6 py-4 my-auto"
+                    className="w-full text-center space-y-6 py-4 my-auto"
                   >
                     <div className="inline-flex items-center gap-1.5 border border-border bg-muted px-3 py-1 text-xs font-bold uppercase tracking-widest text-muted-foreground select-none">
                       <span>
@@ -965,7 +965,7 @@ function App() {
                     initial="initial"
                     animate="animate"
                     exit="exit"
-                    className="text-center space-y-6 py-4 my-auto"
+                    className="w-full text-center space-y-6 py-4 my-auto"
                   >
                     <div className="space-y-2">
                       <div className="inline-flex items-center justify-center p-3 border-2 border-border bg-primary/15 shadow-brutal-sm mx-auto select-none">

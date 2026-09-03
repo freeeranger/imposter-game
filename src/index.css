@@ -23,9 +23,9 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
 
-  /* violet ~ #c084fc (matches the Tjeneritz tile on the freeranger hub) */
-  --primary: #c084fc;
-  --primary-foreground: oklch(0.145 0 0);
+  /* Covert amber: high contrast against light paper (>= 4.5:1 WCAG AA) */
+  --primary: oklch(0.55 0.17 62);
+  --primary-foreground: oklch(0.985 0 0);
 
   --secondary: oklch(0.96 0 0);
   --secondary-foreground: oklch(0.145 0 0);
@@ -57,7 +57,8 @@
   --popover: oklch(0.225 0 0);
   --popover-foreground: oklch(0.96 0 0);
 
-  --primary: #c084fc;
+  /* Electric amber: classified dossier / covert terminal glow */
+  --primary: oklch(0.78 0.18 68);
   --primary-foreground: oklch(0.18 0 0);
 
   --secondary: oklch(0.28 0 0);
