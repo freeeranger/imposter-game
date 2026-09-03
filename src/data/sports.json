@@ -29,7 +29,10 @@
     "Judo",
     "Esports",
     "Bowling",
-    "Darts"
+    "Darts",
+    "Floorball",
+    "Climbing",
+    "Crossfit"
   ],
   "hard": [
     "Ski Jumping",
@@ -45,6 +48,9 @@
     "Rally",
     "Snooker",
     "Curling",
-    "Padel"
+    "Padel",
+    "Lacrosse",
+    "Triathlon",
+    "Long Jump"
   ]
 }

@@ -1,6 +1,5 @@
 {
   "name": "Football",
-  "wip": true,
   "easy": [
     "VAR",
     "La Liga",
@@ -13,13 +12,28 @@
     "Derby",
     "Arsenal",
     "Bayern München",
-    "WC"
+    "Manchester City",
+    "Haaland",
+    "Messi",
+    "Ronaldo",
+    "Mbappé",
+    "Olise",
+    "PSG",
+    "World Cup",
+    "Zlatan",
+    "AIK",
+    "Hammarby",
+    "Djurgården"
   ],
   "hard": [
     "Serie A",
     "1891",
     "Ultras",
     "Jose Mourinho",
-    "Pep Guardiola"
+    "Pep Guardiola",
+    "Offside",
+    "Conference League",
+    "Europa League",
+    "Transfer Window"
   ]
 }

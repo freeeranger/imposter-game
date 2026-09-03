@@ -45,7 +45,14 @@
     "Adobe Acrobat Reader",
     "Adobe Lightroom",
     "Pinterest",
-    "Adobe Photoshop"
+    "Adobe Photoshop",
+    "BeReal",
+    "Tinder",
+    "Hinge",
+    "Reddit",
+    "Waze",
+    "SoundCloud",
+    "Vinted"
   ],
   "hard": [
     "Obsidian",
@@ -80,6 +87,8 @@
     "Notepad++",
     "DBeaver",
     "AnyDesk",
-    "TeamViewer"
+    "TeamViewer",
+    "Strava",
+    "Flightradar24"
   ]
 }

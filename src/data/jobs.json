@@ -40,7 +40,13 @@
     "Painter",
     "Gardener",
     "Paramedic",
-    "Accountant"
+    "Accountant",
+    "Influencer",
+    "Astronaut",
+    "Politician",
+    "DJ",
+    "Judge",
+    "Priest"
   ],
   "hard": [
     "Architect",
@@ -75,6 +81,9 @@
     "Tailor",
     "Jeweler",
     "Chauffeur",
-    "Funeral Director"
+    "Funeral Director",
+    "Sommelier",
+    "Private Investigator",
+    "Voice Actor"
   ]
 }

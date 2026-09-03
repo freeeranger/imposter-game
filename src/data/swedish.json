@@ -1,6 +1,5 @@
 {
   "name": "Swedish Stuff",
-  "wip": true,
   "easy": [
     "Juvul",
     "Grisch",
@@ -32,7 +31,14 @@
     "Sommarprat",
     "Avicii",
     "Minecraft",
-    "Spotify"
+    "Spotify",
+    "Kalles Kaviar",
+    "Kebabpizza",
+    "Kanelbulle",
+    "Marabou",
+    "Surströmming",
+    "Falukorv",
+    "EPA"
   ],
   "hard": [
     "Årets wok",
@@ -44,6 +50,9 @@
     "Mello",
     "Storytime",
     "Skolavslutning",
-    "Ullared"
+    "Ullared",
+    "Kalle Anka",
+    "Fackföreningar",
+    "Svensk sommar"
   ]
 }

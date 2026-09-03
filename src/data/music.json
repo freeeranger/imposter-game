@@ -1,6 +1,5 @@
 {
   "name": "Music",
-  "wip": true,
   "easy": [
     "Grisch",
     "Roadtrip",
@@ -23,7 +22,9 @@
     "Movie Soundtracks",
     "Game Soundtracks",
     "Disney",
-    "WC Anthems"
+    "WC Anthems",
+    "Elevator Music",
+    "Disco"
   ],
   "hard": [
     "Snow Day",
