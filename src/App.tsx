@@ -73,9 +73,9 @@ const CATEGORY_KEYS = Object.keys(CATEGORIES);
 const DEFAULT_CATEGORY = CATEGORY_KEYS[0] ?? "random";
 type Difficulty = "easy" | "hard" | "all";
 const DIFFICULTY_DESCRIPTIONS: Record<Difficulty, string> = {
-  easy: "More common and obvious words.",
-  hard: "More niche and less obvious words.",
-  all: "Mixes both easy and hard words.",
+  easy: "Everyday words everyone knows.",
+  hard: "Trickier words that test your poker face.",
+  all: "A mix of obvious and niche words.",
 };
 
 const getCategoryWords = (category: Category, difficulty: Difficulty): string[] => {
@@ -286,6 +286,19 @@ function App() {
   }, [theme]);
 
   useEffect(() => {
+    if (!showInfoModal) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowInfoModal(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showInfoModal]);
+
+  useEffect(() => {
     try {
       window.localStorage.setItem(
         SETTINGS_STORAGE_KEY,
@@ -489,7 +502,7 @@ function App() {
     primaryDisabled = false;
     primaryAction = nextTurn;
   } else if (gameState === "end") {
-    primaryLabel = "New Game";
+    primaryLabel = "Play again";
     primaryIcon = RotateCcw;
     primaryDisabled = false;
     primaryAction = resetToSetup;
@@ -512,8 +525,8 @@ function App() {
     : [];
 
   return (
-    <div className="relative box-border flex h-dvh min-h-dvh w-full items-center justify-center overflow-hidden bg-background p-4 transition-colors">
-      <div className="absolute right-4 top-4 z-20 flex items-center gap-2 md:right-6 md:top-6">
+    <div className="relative box-border flex h-dvh min-h-dvh w-full items-center justify-center overflow-hidden bg-background p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] transition-colors select-none">
+      <div className="absolute right-[max(1rem,env(safe-area-inset-right))] top-[max(1rem,env(safe-area-inset-top))] z-20 flex items-center gap-2 md:right-6 md:top-6">
         <Button
           variant="outline"
           size="icon"
@@ -570,23 +583,22 @@ function App() {
         className="mx-auto flex h-full w-full max-w-md items-center justify-center"
       >
         <Card
-          className={cn(
-            "flex w-full flex-col overflow-hidden shadow-brutal transition-all duration-200",
-            gameState === "setup"
-              ? "max-h-[calc(100dvh-5.5rem)] md:max-h-[calc(100dvh-6.5rem)]"
-              : "min-h-[22rem] md:min-h-[26rem]",
-          )}
+          className="flex w-full flex-col overflow-hidden shadow-brutal transition-all duration-200"
+          style={{
+            minHeight: "min(38rem, calc(100dvh - 5rem))",
+            maxHeight: "calc(100dvh - 5rem)",
+          }}
         >
           <CardHeader className="text-center pb-2 pt-6 shrink-0">
             <CardTitle className="text-2xl md:text-3xl font-black tracking-tight">
               Imposter Game
             </CardTitle>
             <CardDescription className="text-xs uppercase tracking-wider">
-              Find the imposter among you
+              Pass the phone and spot the liar
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto overscroll-contain px-6 py-2">
-            <div className="flex min-h-full flex-col [justify-content:safe_center] py-2">
+            <div className="flex min-h-full flex-col justify-center py-2">
               <AnimatePresence
                 mode="wait"
                 initial={false}
@@ -600,7 +612,7 @@ function App() {
                     initial="initial"
                     animate="animate"
                     exit="exit"
-                    className="space-y-6"
+                    className="space-y-6 my-auto"
                   >
                     <div className="grid grid-cols-2 gap-3.5">
                       <div className="space-y-1.5">
@@ -802,7 +814,7 @@ function App() {
                           Randomize Starting Player
                         </Label>
                         <p className="text-xs text-muted-foreground leading-relaxed">
-                          Randomly picks someone to speak first.
+                          Picks who speaks first so nobody hesitates.
                         </p>
                       </div>
                       <Switch
@@ -822,7 +834,7 @@ function App() {
                             Imposters Know Each Other
                           </Label>
                           <p className="text-xs text-muted-foreground leading-relaxed">
-                            Each imposter is shown who the others are.
+                            Imposters see each other's player numbers.
                           </p>
                         </div>
                         <Switch
@@ -856,14 +868,14 @@ function App() {
                     initial="initial"
                     animate="animate"
                     exit="exit"
-                    className="text-center space-y-6 py-4"
+                    className="text-center space-y-6 py-4 my-auto"
                   >
                     <div className="inline-flex items-center gap-1.5 border border-border bg-muted px-3 py-1 text-xs font-bold uppercase tracking-widest text-muted-foreground select-none">
                       <span>
                         Player {currentPlayer} of {playersCount}
                       </span>
                     </div>
-                    <div className="space-y-1.5">
+                    <div className="space-y-2">
                       <h2 className="text-xl font-bold uppercase tracking-tight text-muted-foreground">
                         Pass device to
                       </h2>
@@ -871,10 +883,9 @@ function App() {
                         Player {currentPlayer}
                       </p>
                     </div>
-                    <div className="border-2 border-border bg-muted/60 p-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-center gap-2 select-none">
-                      <EyeOff className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <span>Keep screen hidden until you hold the phone</span>
-                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Make sure no one else is looking at the screen.
+                    </p>
                   </motion.div>
                 )}
 
@@ -886,74 +897,63 @@ function App() {
                     initial="initial"
                     animate="animate"
                     exit="exit"
-                    className="text-center space-y-4 py-2"
+                    className="text-center space-y-6 py-4 my-auto"
                   >
                     <div className="inline-flex items-center gap-1.5 border border-border bg-muted px-3 py-1 text-xs font-bold uppercase tracking-widest text-muted-foreground select-none">
                       <span>
                         Player {currentPlayer} of {playersCount}
                       </span>
                     </div>
-                    <div className="border-2 border-border bg-card p-5 shadow-brutal-sm">
-                      {currentAssignment?.isImposter ? (
-                        <div className="space-y-3.5">
-                          <div className="border-2 border-destructive bg-destructive/10 p-4">
-                            <p className="text-xs font-bold uppercase tracking-widest text-destructive">
-                              Secret Role
-                            </p>
-                            <p className="text-3xl md:text-4xl font-black uppercase tracking-tight text-destructive mt-1">
-                              YOU ARE THE IMPOSTER
-                            </p>
-                          </div>
-                          <div className="border border-border bg-muted/50 p-2.5">
-                            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                              Category
-                            </p>
-                            <p className="text-lg font-bold text-foreground">
-                              {CATEGORIES[activeCategory]?.label}
-                            </p>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            Try to blend in with the rest of the table. Listen carefully before you speak!
+
+                    {currentAssignment?.isImposter ? (
+                      <div className="space-y-4">
+                        <div className="space-y-1">
+                          <p className="text-xs font-bold uppercase tracking-widest text-destructive">
+                            Secret role
                           </p>
-                          {fellowImposters.length > 0 && (
-                            <div className="mt-3 border-2 border-border bg-background p-3">
-                              <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-                                {fellowImposters.length === 1
-                                  ? "Your fellow imposter"
-                                  : "Your fellow imposters"}
-                              </p>
-                              <p className="mt-1 text-base font-bold uppercase tracking-tight text-destructive">
-                                {fellowImposters
-                                  .map((number) => `Player ${number}`)
-                                  .join(" · ")}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="space-y-3.5">
-                          <div className="border-2 border-primary bg-primary/10 p-4">
-                            <p className="text-xs font-bold uppercase tracking-widest text-primary">
-                              The Word Is
-                            </p>
-                            <p className="text-3xl md:text-4xl font-black uppercase tracking-tight text-foreground mt-1">
-                              {currentAssignment?.word ?? "No word"}
-                            </p>
-                          </div>
-                          <div className="border border-border bg-muted/50 p-2.5">
-                            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                              Category
-                            </p>
-                            <p className="text-lg font-bold text-foreground">
-                              {CATEGORIES[activeCategory]?.label}
-                            </p>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            Give a subtle clue to prove you know the word without giving it away!
+                          <p className="text-4xl md:text-5xl font-black uppercase tracking-tight text-destructive">
+                            YOU ARE THE IMPOSTER
                           </p>
                         </div>
-                      )}
-                    </div>
+                        <p className="text-lg text-muted-foreground">
+                          Category:{" "}
+                          <span className="font-bold text-foreground">
+                            {CATEGORIES[activeCategory]?.label}
+                          </span>
+                        </p>
+                        {fellowImposters.length > 0 && (
+                          <div className="mt-3 border-2 border-border bg-muted/50 p-2.5 max-w-xs mx-auto">
+                            <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+                              {fellowImposters.length === 1
+                                ? "Fellow imposter"
+                                : "Fellow imposters"}
+                            </p>
+                            <p className="mt-0.5 text-base font-bold uppercase tracking-tight text-destructive">
+                              {fellowImposters
+                                .map((number) => `Player ${number}`)
+                                .join(" · ")}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="space-y-1">
+                          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                            Secret word
+                          </p>
+                          <p className="text-4xl md:text-5xl font-black uppercase tracking-tight text-primary">
+                            {currentAssignment?.word ?? "No word"}
+                          </p>
+                        </div>
+                        <p className="text-lg text-muted-foreground">
+                          Category:{" "}
+                          <span className="font-bold text-foreground">
+                            {CATEGORIES[activeCategory]?.label}
+                          </span>
+                        </p>
+                      </div>
+                    )}
                   </motion.div>
                 )}
 
@@ -965,17 +965,17 @@ function App() {
                     initial="initial"
                     animate="animate"
                     exit="exit"
-                    className="text-center space-y-6 py-4"
+                    className="text-center space-y-6 py-4 my-auto"
                   >
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       <div className="inline-flex items-center justify-center p-3 border-2 border-border bg-primary/15 shadow-brutal-sm mx-auto select-none">
                         <VenetianMask className="h-7 w-7 text-primary" />
                       </div>
                       <h2 className="text-3xl font-black uppercase tracking-tight text-primary">
-                        Game Started!
+                        All clear
                       </h2>
                       <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                        Everyone has seen their role. Start discussing and figure out who is bluffing this round!
+                        Everyone has seen their card. Put the phone down and start talking.
                       </p>
                     </div>
                     {startingPlayer && (
@@ -991,14 +991,14 @@ function App() {
                         <div className="flex items-center justify-center gap-2 mb-2">
                           <Shuffle className="w-5 h-5 text-primary" />
                           <p className="text-xs font-bold uppercase tracking-wider text-primary">
-                            Random Starter
+                            First to speak
                           </p>
                         </div>
                         <p className="text-2xl font-black uppercase tracking-tight text-foreground">
                           Player {startingPlayer}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          goes first this round!
+                          Gives the first clue.
                         </p>
                       </motion.div>
                     )}
@@ -1029,8 +1029,8 @@ function App() {
                 {gameState === "setup" && primaryDisabled && (
                   <p className="mt-2 text-center text-xs font-bold uppercase tracking-wider text-destructive">
                     {impostersCount >= playersCount
-                      ? "Imposters must be fewer than players"
-                      : "Select at least one category to start"}
+                      ? "Need more players than imposters"
+                      : "Pick at least one category to start"}
                   </p>
                 )}
               </motion.div>
@@ -1051,6 +1051,9 @@ function App() {
               onClick={() => setShowInfoModal(false)}
             />
             <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="info-modal-title"
               initial={{ opacity: 0, scale: 0.95, y: 8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 8 }}
@@ -1059,7 +1062,10 @@ function App() {
               <div className="flex items-center justify-between border-b-2 border-border pb-3">
                 <div className="flex items-center gap-2">
                   <VenetianMask className="h-5 w-5 text-primary" />
-                  <h3 className="font-black uppercase tracking-tight text-lg">
+                  <h3
+                    id="info-modal-title"
+                    className="font-black uppercase tracking-tight text-lg"
+                  >
                     Imposter Game
                   </h3>
                 </div>

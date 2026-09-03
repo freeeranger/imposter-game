@@ -120,6 +120,32 @@
     @apply border-border outline-ring/50;
     scrollbar-width: thin;
     scrollbar-color: var(--border) transparent;
+    -webkit-tap-highlight-color: transparent;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  input,
+  textarea {
+    -webkit-user-select: auto;
+    user-select: auto;
+  }
+  button,
+  a,
+  input,
+  [role="button"] {
+    touch-action: manipulation;
+  }
+  img,
+  svg {
+    -webkit-user-drag: none;
   }
   ::selection {
     background-color: var(--primary);
