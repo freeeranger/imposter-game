@@ -526,11 +526,22 @@ function App() {
 
   return (
     <div className="relative box-border flex h-dvh min-h-dvh w-full items-center justify-center overflow-hidden bg-background p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] transition-colors select-none">
+      {/* Subtle ambient tabletop dot grid */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 opacity-[0.025] dark:opacity-[0.04]"
+        style={{
+          backgroundImage:
+            "radial-gradient(var(--border) 1px, transparent 1px)",
+          backgroundSize: "24px 24px",
+        }}
+      />
+
       <div className="absolute right-[max(1rem,env(safe-area-inset-right))] top-[max(1rem,env(safe-area-inset-top))] z-20 flex items-center gap-2 md:right-6 md:top-6">
         <Button
           variant="outline"
           size="icon"
-          className="h-9 w-9 border-2"
+          className="h-9 w-9 border-2 shadow-brutal-sm"
           onClick={() => setShowInfoModal(true)}
           aria-label="Game information & rules"
         >
@@ -539,7 +550,7 @@ function App() {
         <Button
           variant="outline"
           size="icon"
-          className="h-9 w-9 border-2"
+          className="h-9 w-9 border-2 shadow-brutal-sm"
           onClick={() =>
             setTheme((currentTheme) =>
               currentTheme === "dark" ? "light" : "dark",
@@ -583,17 +594,17 @@ function App() {
         className="mx-auto flex h-full w-full max-w-md items-center justify-center"
       >
         <Card
-          className="flex w-full flex-col overflow-hidden shadow-brutal transition-all duration-200"
+          className="flex w-full flex-col overflow-hidden shadow-brutal-md transition-all duration-200"
           style={{
             minHeight: "min(38rem, calc(100dvh - 5rem))",
             maxHeight: "calc(100dvh - 5rem)",
           }}
         >
-          <CardHeader className="text-center pb-2 pt-6 shrink-0">
-            <CardTitle className="text-2xl md:text-3xl font-black tracking-tight">
+          <CardHeader className="text-center pb-4 pt-5 shrink-0 border-b-2 border-border">
+            <CardTitle className="text-2xl md:text-3xl font-black uppercase tracking-tight text-foreground">
               Imposter Game
             </CardTitle>
-            <CardDescription className="text-xs uppercase tracking-wider">
+            <CardDescription className="text-xs uppercase tracking-widest font-bold text-muted-foreground mt-0.5">
               Pass the phone and spot the liar
             </CardDescription>
           </CardHeader>
@@ -728,7 +739,7 @@ function App() {
                       </div>
 
                       {selectedCategory === "random" && (
-                        <div className="space-y-2.5 bg-muted/30 p-3.5">
+                        <div className="space-y-2.5 border-2 border-border bg-muted/20 p-3.5 shadow-brutal-sm">
                           <div className="flex items-center justify-between">
                             <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                               Include Categories
@@ -805,7 +816,7 @@ function App() {
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between p-3.5 bg-muted/40 transition-colors">
+                    <div className="flex items-center justify-between border-2 border-border p-3.5 bg-background shadow-brutal-sm">
                       <div className="space-y-0.5 pr-3">
                         <Label
                           htmlFor="randomize-starter"
@@ -825,7 +836,7 @@ function App() {
                     </div>
 
                     {impostersCount >= 2 && (
-                      <div className="flex items-center justify-between p-3.5 bg-muted/40 transition-colors">
+                      <div className="flex items-center justify-between border-2 border-border p-3.5 bg-background shadow-brutal-sm">
                         <div className="space-y-0.5 pr-3">
                           <Label
                             htmlFor="fellow-imposters"
@@ -907,14 +918,9 @@ function App() {
 
                     {currentAssignment?.isImposter ? (
                       <div className="space-y-4">
-                        <div className="space-y-1">
-                          <p className="text-xs font-bold uppercase tracking-widest text-destructive">
-                            Secret role
-                          </p>
-                          <p className="text-4xl md:text-5xl font-black uppercase tracking-tight text-destructive">
-                            YOU ARE THE IMPOSTER
-                          </p>
-                        </div>
+                        <p className="text-4xl md:text-5xl font-black uppercase tracking-tight text-destructive">
+                          YOU ARE THE IMPOSTER
+                        </p>
                         <p className="text-lg text-muted-foreground">
                           Category:{" "}
                           <span className="font-bold text-foreground">
@@ -922,7 +928,7 @@ function App() {
                           </span>
                         </p>
                         {fellowImposters.length > 0 && (
-                          <div className="mt-3 border-2 border-border bg-muted/50 p-2.5 max-w-xs mx-auto">
+                          <div className="mt-3 border-2 border-border bg-muted/50 p-2.5 max-w-xs mx-auto shadow-brutal-sm">
                             <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
                               {fellowImposters.length === 1
                                 ? "Fellow imposter"
@@ -938,14 +944,9 @@ function App() {
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        <div className="space-y-1">
-                          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                            Secret word
-                          </p>
-                          <p className="text-4xl md:text-5xl font-black uppercase tracking-tight text-primary">
-                            {currentAssignment?.word ?? "No word"}
-                          </p>
-                        </div>
+                        <p className="text-4xl md:text-5xl font-black uppercase tracking-tight text-primary">
+                          {currentAssignment?.word ?? "No word"}
+                        </p>
                         <p className="text-lg text-muted-foreground">
                           Category:{" "}
                           <span className="font-bold text-foreground">
@@ -1018,7 +1019,7 @@ function App() {
               >
                 <Button
                   onClick={primaryAction}
-                  className="h-14 w-full text-xl"
+                  className="h-14 w-full text-xl shadow-brutal-md hover:shadow-brutal active:translate-x-1.5 active:translate-y-1.5"
                   size="lg"
                   variant={primaryVariant}
                   disabled={primaryDisabled}

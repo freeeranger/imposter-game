@@ -46,17 +46,17 @@ function NumberStepper({
       {Icon && (
         <Icon className={cn("h-5 w-5 text-muted-foreground", iconClassName)} />
       )}
-      <div className="flex flex-1 items-center gap-1 border-2 border-border bg-background p-1 transition-[box-shadow] focus-within:shadow-brutal-sm">
+      <div className="flex flex-1 items-center gap-1 border-2 border-border bg-background p-1 shadow-brutal-sm">
         <Button
           type="button"
-          variant="ghost"
+          variant="outline"
           size="icon"
-          className="h-8 w-8"
+          className="h-8 w-8 shrink-0 border-2 border-border bg-muted text-foreground transition-all duration-75 hover:bg-foreground hover:text-background active:translate-x-0.5 active:translate-y-0.5 active:shadow-none shadow-none"
           onClick={() => updateValue(value - step)}
           disabled={value <= min}
           aria-label={`Decrease ${id}`}
         >
-          <Minus className="h-4 w-4" />
+          <Minus className="h-4 w-4 stroke-[2.5]" />
         </Button>
         <div className="relative flex-1">
           <Input
@@ -105,7 +105,7 @@ function NumberStepper({
               onChange(clamp(nextValue, min, max));
             }}
             className={cn(
-              "h-8 border-0 bg-transparent text-center text-base md:text-sm shadow-none [appearance:textfield] focus-visible:shadow-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+              "h-8 border-0 bg-transparent text-center font-black text-lg md:text-base tabular-nums shadow-none [appearance:textfield] focus-visible:shadow-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
               suffix ? "pr-8" : undefined,
             )}
           />
@@ -117,14 +117,14 @@ function NumberStepper({
         </div>
         <Button
           type="button"
-          variant="ghost"
+          variant="outline"
           size="icon"
-          className="h-8 w-8"
+          className="h-8 w-8 shrink-0 border-2 border-border bg-muted text-foreground transition-all duration-75 hover:bg-foreground hover:text-background active:translate-x-0.5 active:translate-y-0.5 active:shadow-none shadow-none"
           onClick={() => updateValue(value + step)}
           disabled={value >= max}
           aria-label={`Increase ${id}`}
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="h-4 w-4 stroke-[2.5]" />
         </Button>
       </div>
     </div>
