@@ -41,7 +41,7 @@ function RollingNumber({
           initial="enter"
           animate="center"
           exit="exit"
-          transition={{ type: "spring", stiffness: 520, damping: 36 }}
+          transition={{ type: "spring", stiffness: 700, damping: 40 }}
           className="inline-block tabular-nums"
         >
           {value}

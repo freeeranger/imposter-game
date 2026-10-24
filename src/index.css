@@ -130,22 +130,12 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) transparent;
+    /* Touch-first app: hidden scrollbars, since a real one (Android WebView) takes width and shifts the layout. */
+    scrollbar-width: none;
     -webkit-tap-highlight-color: transparent;
   }
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: var(--border);
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: var(--primary);
+    display: none;
   }
   html,
   body,

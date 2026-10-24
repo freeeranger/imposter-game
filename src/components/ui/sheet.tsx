@@ -36,7 +36,7 @@ function Sheet({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.15 }}
             className="fixed inset-0 bg-overlay"
             onClick={onClose}
           />
@@ -47,11 +47,11 @@ function Sheet({
             initial={{ y: "100%" }}
             animate={{
               y: 0,
-              transition: { type: "spring", stiffness: 380, damping: 36 },
+              transition: { type: "spring", stiffness: 560, damping: 44 },
             }}
             exit={{
               y: "100%",
-              transition: { type: "spring", stiffness: 420, damping: 42 },
+              transition: { duration: 0.2, ease: [0.4, 0, 1, 1] },
             }}
             drag="y"
             dragListener={false}
