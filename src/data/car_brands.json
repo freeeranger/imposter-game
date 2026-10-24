@@ -1,5 +1,6 @@
 {
   "name": "Car Brands",
+  "tag": "updated",
   "easy": [
     "Toyota",
     "Honda",
@@ -23,33 +24,29 @@
     "Volvo",
     "Skoda",
     "Jeep",
-    "Koenigsegg"
+    "Koenigsegg",
+    "Peugeot",
+    "Renault",
+    "Fiat",
+    "Land Rover",
+    "Jaguar",
+    "Rolls-Royce"
   ],
   "hard": [
-    "Peugeot",
     "SEAT",
-    "Renault",
     "Citroën",
     "Aston Martin",
-    "Rolls-Royce",
-    "Jaguar",
-    "Land Rover",
-    "Fiat",
     "Alfa Romeo",
     "Maserati",
     "Bugatti",
     "Chrysler",
     "Dodge",
-    "Ram",
     "Cadillac",
-    "GMC",
-    "Lincoln",
-    "Infiniti",
-    "Acura",
     "Mitsubishi",
     "Suzuki",
     "Lotus",
     "McLaren",
-    "Pagani"
+    "Pagani",
+    "Polestar"
   ]
 }

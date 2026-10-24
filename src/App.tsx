@@ -28,6 +28,7 @@ import {
   Github,
   Info,
   Moon,
+  Music,
   Play,
   RotateCcw,
   Shuffle,
@@ -46,6 +47,7 @@ type CategoryFile = {
   easy: string[];
   hard: string[];
   tag?: CategoryTag;
+  hint?: string;
 };
 
 type Category = {
@@ -53,6 +55,7 @@ type Category = {
   easy: string[];
   hard: string[];
   tag?: CategoryTag;
+  hint?: string;
 };
 
 const categoryFiles = import.meta.glob<{ default: CategoryFile }>(
@@ -64,8 +67,8 @@ const CATEGORIES: Record<string, Category> = Object.fromEntries(
   Object.entries(categoryFiles).map(([path, module]) => {
     const fileName = path.split("/").pop() ?? path;
     const key = fileName.replace(".json", "");
-    const { name, easy, hard, tag } = module.default;
-    return [key, { label: name, easy, hard, tag }];
+    const { name, easy, hard, tag, hint } = module.default;
+    return [key, { label: name, easy, hard, tag, hint }];
   }),
 );
 
@@ -102,6 +105,14 @@ const CategoryTagBadge = ({
     {tag}
   </span>
 );
+
+const CategoryHint = ({ hint }: { hint?: string }) =>
+  hint ? (
+    <div className="mx-auto flex max-w-xs items-center justify-center gap-2 border-2 border-border bg-tag-updated px-3 py-2 text-sm font-bold text-tag-updated-foreground shadow-brutal-sm">
+      <Music className="size-4 shrink-0" aria-hidden />
+      <span>{hint}</span>
+    </div>
+  ) : null;
 
 const getCategoryWords = (category: Category, difficulty: Difficulty): string[] => {
   if (difficulty === "easy") return category.easy;
@@ -954,6 +965,7 @@ function App() {
                             {CATEGORIES[activeCategory]?.label}
                           </span>
                         </p>
+                        <CategoryHint hint={CATEGORIES[activeCategory]?.hint} />
                         {fellowImposters.length > 0 && (
                           <div className="mt-3 border-2 border-border bg-muted/50 p-2.5 max-w-xs mx-auto shadow-brutal-sm">
                             <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
@@ -980,6 +992,7 @@ function App() {
                             {CATEGORIES[activeCategory]?.label}
                           </span>
                         </p>
+                        <CategoryHint hint={CATEGORIES[activeCategory]?.hint} />
                       </div>
                     )}
                   </motion.div>

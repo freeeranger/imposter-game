@@ -1,10 +1,11 @@
 {
   "name": "Music",
   "tag": "updated",
+  "hint": "Play a song as your clue. Don't say anything!",
   "easy": [
     "Grisch",
     "Roadtrip",
-    "The hoods",
+    "The Hoods",
     "Workout",
     "Afterski",
     "Summer",
@@ -23,25 +24,31 @@
     "Movie Soundtracks",
     "Game Soundtracks",
     "Disney",
-    "WC Anthems",
-    "Elevator Music",
-    "Disco"
+    "Disco",
+    "Christmas",
+    "Festival",
+    "Wedding",
+    "Falling in Love"
   ],
   "hard": [
     "Snow Day",
     "Rain Day",
     "4AM",
-    "Tiktok",
+    "TikTok",
     "Autotune",
-    "Guitar",
     "EDM",
-    "Christmas",
     "Phonk",
     "Techno",
     "Lo-fi",
     "Jazz",
     "One-Hit Wonders",
     "Pregame",
-    "Heartbreak"
+    "Heartbreak",
+    "Villain Era",
+    "Main Character",
+    "Sauna",
+    "Sad Girl Hours",
+    "Throwback 2010",
+    "Revenge"
   ]
 }

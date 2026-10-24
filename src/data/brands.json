@@ -1,5 +1,6 @@
 {
-  "name": "Consumer Product Brands",
+  "name": "Brands",
+  "tag": "updated",
   "easy": [
     "Coca-Cola",
     "Pepsi",
@@ -35,22 +36,23 @@
     "Oatly",
     "Barebells",
     "Fjällräven",
-    "Kalles (kaviar)",
+    "Kalles Kaviar",
     "Vaseline",
     "Converse",
     "Moncler",
-    "Pickadeli"
-  ],
-  "hard": [
-    "ProPud",
-    "Dove",
-    "Nivea",
-    "JBL",
-    "Dyson",
+    "Pickadeli",
     "Oreo",
     "KitKat",
     "Snickers",
     "Twix",
+    "Dove",
+    "Nivea",
+    "JBL",
+    "Beats"
+  ],
+  "hard": [
+    "ProPud",
+    "Dyson",
     "Ramlösa",
     "Loka",
     "Zingo",
@@ -66,7 +68,6 @@
     "Old Spice",
     "Pampers",
     "Sennheiser",
-    "Beats",
     "Harman Kardon",
     "Marshall",
     "Anker",
