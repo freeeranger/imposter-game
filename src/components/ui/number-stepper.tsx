@@ -54,7 +54,7 @@ function NumberStepper({
     >
       <Button
         type="button"
-        variant="raised"
+        variant={size === "lg" ? "outline" : "ghost"}
         size="icon"
         onClick={() => updateValue(value - step)}
         disabled={value <= min}
@@ -65,7 +65,7 @@ function NumberStepper({
       <div
         className={cn(
           "flex items-baseline justify-center font-display font-extrabold leading-none",
-          size === "lg" ? "min-w-0 flex-1 text-[2.75rem]" : "text-xl",
+          size === "lg" ? "min-w-0 flex-1 text-[3.125rem]" : "text-[17px]",
           valueClassName,
         )}
       >
@@ -123,14 +123,14 @@ function NumberStepper({
           )}
         </span>
         {suffix && (
-          <span className={size === "lg" ? "text-2xl" : "text-base"}>
+          <span className={size === "lg" ? "text-2xl" : "-ml-0.5 text-base"}>
             {suffix}
           </span>
         )}
       </div>
       <Button
         type="button"
-        variant="raised"
+        variant={size === "lg" ? "outline" : "ghost"}
         size="icon"
         onClick={() => updateValue(value + step)}
         disabled={value >= max}

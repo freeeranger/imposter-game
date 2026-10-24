@@ -95,25 +95,27 @@ const DIFFICULTY_DESCRIPTIONS: Record<Difficulty, string> = {
   all: "a mix of obvious and niche words.",
 };
 
-const CategoryTagBadge = ({
+// Tags read as little stickers slapped on the corner of a card.
+const CategorySticker = ({
   tag,
   onPrimary = false,
-  size = "sm",
+  className,
 }: {
   tag: CategoryTag;
   onPrimary?: boolean;
-  size?: "sm" | "md";
+  className?: string;
 }) => (
   <span
     className={cn(
-      "inline-flex shrink-0 items-center rounded-full font-bold uppercase tracking-[0.06em]",
-      size === "sm" ? "px-1.5 text-[9px] leading-[13px]" : "px-2 text-[10px] leading-4",
-      tag === "new" && !onPrimary && "bg-pink py-px text-pink-foreground",
-      tag === "new" && onPrimary && "bg-primary-foreground py-px text-[#ff4fa3]",
+      "inline-flex shrink-0 items-center rounded-full px-2 text-[10px] leading-4 font-bold",
+      tag === "new" ? "rotate-6" : "rotate-[5deg]",
+      tag === "new" && !onPrimary && "bg-pink text-pink-foreground",
+      tag === "new" && onPrimary && "bg-primary-foreground text-[#ff4fa3]",
       tag === "updated" &&
         (onPrimary
           ? "border-[1.5px] border-primary-foreground text-primary-foreground"
-          : "border-[1.5px] border-pink text-pink"),
+          : "border-[1.5px] border-pink bg-card text-pink"),
+      className,
     )}
   >
     {tag}
@@ -838,6 +840,9 @@ function App() {
     ? undefined
     : CATEGORIES[selectedCategory];
   const randomPoolCount = CATEGORY_KEYS.filter((key) => randomPool[key]).length;
+  const selectedWordCount = selectedCategoryInfo
+    ? getUniqueCategoryWords(selectedCategoryInfo, selectedDifficulty).length
+    : 0;
   const activeCategoryInfo = CATEGORIES[activeCategory];
   const canRevealFellows = impostersCount >= 2;
 
@@ -856,20 +861,20 @@ function App() {
                   exit={FADE_OUT}
                   className="flex h-11 items-center justify-between"
                 >
-                  <h1 className="font-display text-[30px] font-extrabold leading-none tracking-[-0.03em]">
+                  <h1 className="font-display text-[28px] font-extrabold leading-none tracking-[-0.03em]">
                     imposter
                   </h1>
-                  <div className="flex gap-2">
+                  <div className="-mr-2.5 flex">
                     <Button
-                      variant="secondary"
+                      variant="ghost"
                       size="icon"
                       onClick={() => setShowInfoModal(true)}
                       aria-label="How to play"
                     >
-                      <Info className="size-[18px]" />
+                      <Info className="size-5" />
                     </Button>
                     <Button
-                      variant="secondary"
+                      variant="ghost"
                       size="icon"
                       onClick={() =>
                         setTheme((currentTheme) =>
@@ -892,9 +897,9 @@ function App() {
                           className="inline-flex"
                         >
                           {theme === "dark" ? (
-                            <Sun className="size-[18px]" />
+                            <Sun className="size-5" />
                           ) : (
-                            <Moon className="size-[18px]" />
+                            <Moon className="size-5" />
                           )}
                         </motion.span>
                       </AnimatePresence>
@@ -951,14 +956,14 @@ function App() {
                   )}
                   <motion.div
                     variants={RISE}
-                    className="grid shrink-0 grid-cols-2 rounded-[28px] bg-card py-[18px]"
+                    className="grid shrink-0 grid-cols-2 rounded-[24px] bg-card pt-4 pb-[18px]"
                   >
-                    <div className="flex flex-col items-center gap-2.5 border-r border-border px-3">
+                    <div className="flex flex-col items-center gap-2 border-r border-border/70 px-3.5">
                       <label
                         htmlFor="players"
-                        className="text-sm font-semibold text-muted-foreground"
+                        className="text-[13px] font-semibold text-muted-foreground"
                       >
-                        players
+                        Players
                       </label>
                       <NumberStepper
                         id="players"
@@ -974,12 +979,12 @@ function App() {
                         }}
                       />
                     </div>
-                    <div className="flex flex-col items-center gap-2.5 px-3">
+                    <div className="flex flex-col items-center gap-2 px-3.5">
                       <label
                         htmlFor="imposters"
-                        className="text-sm font-semibold text-muted-foreground"
+                        className="text-[13px] font-semibold text-muted-foreground"
                       >
-                        imposters
+                        Imposters
                       </label>
                       <NumberStepper
                         id="imposters"
@@ -993,42 +998,53 @@ function App() {
                     </div>
                   </motion.div>
 
-                  <motion.div variants={RISE} className="flex shrink-0 flex-col gap-2.5">
-                    <span className="text-sm font-semibold text-muted-foreground">
-                      category
-                    </span>
+                  <motion.div variants={RISE} className="shrink-0 py-1 pr-1.5">
                     <motion.button
                       type="button"
                       onClick={() => setShowCategorySheet(true)}
                       aria-haspopup="dialog"
                       whileTap={{ scale: 0.98 }}
-                      className="flex min-h-[84px] w-full cursor-pointer items-center justify-between gap-3 overflow-hidden rounded-3xl bg-card py-3.5 pr-3.5 pl-5 text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60"
+                      className="relative flex min-h-[88px] w-full -rotate-1 cursor-pointer items-center justify-between gap-3 rounded-[24px] border-[1.5px] border-border bg-card py-3.5 pr-4 pl-5 text-left shadow-[6px_6px_0_var(--pink)] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60"
                     >
+                      <AnimatePresence initial={false}>
+                        {selectedCategoryInfo?.tag && (
+                          <motion.span
+                            key={selectedCategory}
+                            initial={{ opacity: 0, scale: 0.5 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.5 }}
+                            transition={SPRING}
+                            className="absolute -top-[11px] right-[26px]"
+                          >
+                            <CategorySticker
+                              tag={selectedCategoryInfo.tag}
+                              className="px-2.5 py-[3px] text-xs"
+                            />
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
                       <span className="relative flex min-w-0 flex-1 flex-col">
                         <AnimatePresence mode="popLayout" initial={false}>
                           <motion.span
                             key={selectedCategory}
-                            initial={{ opacity: 0, y: 16 }}
+                            initial={{ opacity: 0, y: 14 }}
                             animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -16 }}
+                            exit={{ opacity: 0, y: -14 }}
                             transition={SPRING}
-                            className="flex min-w-0 flex-col gap-1.5"
+                            className="flex min-w-0 flex-col gap-[5px]"
                           >
-                            <span className="flex min-w-0 items-center gap-2.5">
+                            <span className="text-[13px] font-semibold text-muted-foreground">
+                              Category
+                            </span>
+                            <span className="flex min-w-0 items-center gap-2">
                               {isRandomMix && (
                                 <Shuffle className="size-5 shrink-0 text-pink" />
                               )}
-                              <span className="truncate font-display text-[22px] font-extrabold lowercase tracking-[-0.02em] text-highlight">
+                              <span className="truncate font-display text-[26px] leading-none font-extrabold lowercase tracking-[-0.03em] text-highlight">
                                 {isRandomMix
                                   ? "random mix"
                                   : (selectedCategoryInfo?.label ?? "pick one")}
                               </span>
-                              {selectedCategoryInfo?.tag && (
-                                <CategoryTagBadge
-                                  tag={selectedCategoryInfo.tag}
-                                  size="md"
-                                />
-                              )}
                             </span>
                             <span className="flex items-baseline gap-1 text-[13px] text-muted-foreground">
                               {isRandomMix ? (
@@ -1037,26 +1053,41 @@ function App() {
                                   {CATEGORY_KEYS.length}
                                 </>
                               ) : (
-                                `1 of ${CATEGORY_KEYS.length} categories`
+                                <>
+                                  <RollingNumber value={selectedWordCount} /> words
+                                </>
                               )}
                             </span>
                           </motion.span>
                         </AnimatePresence>
                       </span>
-                      <span className="flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-secondary pr-3.5 pl-4 text-sm font-bold">
-                        change
-                        <ChevronRight className="size-4 stroke-[2.5]" />
-                      </span>
+                      <ChevronRight className="size-5 shrink-0 stroke-[2.2] text-muted-foreground" />
                     </motion.button>
                   </motion.div>
 
                   <motion.div variants={RISE} className="flex shrink-0 flex-col gap-2.5">
-                    <span
-                      id="difficulty-label"
-                      className="text-sm font-semibold text-muted-foreground"
-                    >
-                      difficulty
-                    </span>
+                    <div className="flex items-baseline justify-between gap-3 px-1">
+                      <span
+                        id="difficulty-label"
+                        className="text-[13px] font-semibold text-muted-foreground"
+                      >
+                        Difficulty
+                      </span>
+                      <span className="relative h-5 min-w-0 flex-1 overflow-hidden text-right">
+                        <AnimatePresence mode="popLayout" initial={false}>
+                          <motion.span
+                            key={selectedDifficulty}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            transition={SPRING}
+                            className="block truncate text-[13px] text-muted-foreground/80"
+                          >
+                            {DIFFICULTY_DESCRIPTIONS[selectedDifficulty]}
+                          </motion.span>
+                        </AnimatePresence>
+                      </span>
+                    </div>
                     <div
                       role="radiogroup"
                       aria-labelledby="difficulty-label"
@@ -1075,7 +1106,7 @@ function App() {
                               setSelectedDifficulty(difficulty);
                             }}
                             className={cn(
-                              "relative h-11 cursor-pointer rounded-full text-[15px] transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
+                              "relative h-[42px] cursor-pointer rounded-full text-[15px] transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
                               isSelected
                                 ? "font-bold text-primary-foreground"
                                 : "font-semibold text-foreground",
@@ -1095,27 +1126,13 @@ function App() {
                         );
                       })}
                     </div>
-                    <div className="relative h-5 overflow-hidden pl-1">
-                      <AnimatePresence mode="popLayout" initial={false}>
-                        <motion.p
-                          key={selectedDifficulty}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          transition={SPRING}
-                          className="text-[13px] text-muted-foreground"
-                        >
-                          {DIFFICULTY_DESCRIPTIONS[selectedDifficulty]}
-                        </motion.p>
-                      </AnimatePresence>
-                    </div>
                   </motion.div>
 
                   <motion.div
                     variants={RISE}
-                    className="flex shrink-0 flex-col divide-y divide-border rounded-[20px] bg-card pr-3 pl-[18px]"
+                    className="flex shrink-0 flex-col divide-y divide-border/70 rounded-[24px] bg-card pr-3 pl-[18px]"
                   >
-                    <SettingRow id="randomize-starter" title="random first speaker">
+                    <SettingRow id="randomize-starter" title="Random first speaker">
                       <Switch
                         id="randomize-starter"
                         checked={randomizeStarter}
@@ -1133,8 +1150,8 @@ function App() {
                         >
                           <SettingRow
                             id="fellow-imposters"
-                            title="imposters know each other"
-                            description="they see each other’s player numbers."
+                            title="Imposters know each other"
+                            description="They see each other’s player numbers."
                           >
                             <Switch
                               id="fellow-imposters"
@@ -1145,7 +1162,7 @@ function App() {
                         </motion.div>
                       )}
                     </AnimatePresence>
-                    <SettingRow id="prank-probability" title="prank rounds">
+                    <SettingRow id="prank-probability" title="Prank rounds">
                       <NumberStepper
                         id="prank-probability"
                         label="prank chance"
@@ -1161,9 +1178,13 @@ function App() {
                   </motion.div>
 
                   <motion.div variants={RISE} className="flex shrink-0 justify-center">
-                    <Button variant="ghost" size="sm" onClick={resetSettings}>
-                      <RotateCcw className="size-3.5" />
-                      reset settings
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-[13px] text-muted-foreground/80"
+                      onClick={resetSettings}
+                    >
+                      Reset settings
                     </Button>
                   </motion.div>
                 </motion.div>
@@ -1377,8 +1398,9 @@ function App() {
                 pick a category
               </h2>
               <Button
-                variant="raised"
+                variant="ghost"
                 size="icon"
+                className="-mr-2.5"
                 onClick={() => setShowCategorySheet(false)}
                 aria-label="Close"
               >
@@ -1511,19 +1533,24 @@ function App() {
                         pickSingleCategory(key);
                       }}
                       className={cn(
-                        "relative isolate flex h-[50px] cursor-pointer flex-col items-start justify-center gap-[3px] rounded-2xl bg-secondary px-3.5 text-left transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
+                        "relative isolate flex h-[54px] cursor-pointer flex-col items-start justify-center gap-0.5 rounded-2xl bg-secondary px-3.5 text-left transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
                         isSelected
                           ? "text-primary-foreground"
                           : "text-secondary-foreground",
                       )}
                     >
-                      {isSelected && (
-                        <motion.span
-                          layoutId="category-pill"
-                          transition={SPRING}
-                          className="absolute inset-0 -z-10 rounded-2xl bg-primary"
-                        />
-                      )}
+                      {/* Pops in place: a pill gliding across a 2-column grid would cut over other tiles. */}
+                      <AnimatePresence initial={false}>
+                        {isSelected && (
+                          <motion.span
+                            initial={{ opacity: 0, scale: 0.85 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            transition={SPRING}
+                            className="absolute inset-0 -z-10 rounded-2xl bg-primary"
+                          />
+                        )}
+                      </AnimatePresence>
                       <span
                         className={cn(
                           "max-w-full truncate text-[15px] leading-tight lowercase",
@@ -1532,9 +1559,19 @@ function App() {
                       >
                         {category.label}
                       </span>
-                      {category.tag && (
-                        <CategoryTagBadge tag={category.tag} onPrimary={isSelected} />
-                      )}
+                      <span
+                        className={cn(
+                          "flex items-center gap-1.5 text-xs whitespace-nowrap transition-colors duration-200",
+                          isSelected
+                            ? "text-primary-foreground/70"
+                            : "text-muted-foreground/80",
+                        )}
+                      >
+                        {getUniqueCategoryWords(category, selectedDifficulty).length} words
+                        {category.tag && (
+                          <CategorySticker tag={category.tag} onPrimary={isSelected} />
+                        )}
+                      </span>
                     </motion.button>
                   );
                 }
@@ -1556,25 +1593,26 @@ function App() {
                       }));
                     }}
                     className={cn(
-                      "flex h-[50px] cursor-pointer items-center justify-between gap-2 rounded-2xl border-[1.5px] pr-3 pl-3.5 text-left transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
+                      "relative flex h-[54px] cursor-pointer flex-col items-start justify-center gap-0.5 rounded-2xl border-[1.5px] px-3.5 text-left transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
                       isIncluded
                         ? "border-transparent bg-secondary text-secondary-foreground"
                         : "border-border bg-transparent text-muted-foreground",
                     )}
                   >
-                    <span className="flex min-w-0 flex-col items-start gap-[3px]">
-                      <span
-                        className={cn(
-                          "max-w-full truncate text-[15px] leading-tight lowercase",
-                          isIncluded ? "font-semibold" : "font-medium line-through",
-                        )}
-                      >
-                        {category.label}
-                      </span>
-                      {category.tag && <CategoryTagBadge tag={category.tag} />}
+                    <span
+                      className={cn(
+                        "max-w-[calc(100%-1.75rem)] truncate text-[15px] leading-tight lowercase",
+                        isIncluded ? "font-semibold" : "font-medium line-through",
+                      )}
+                    >
+                      {category.label}
+                    </span>
+                    <span className="flex items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground/80">
+                      {getUniqueCategoryWords(category, selectedDifficulty).length} words
+                      {category.tag && <CategorySticker tag={category.tag} />}
                     </span>
                     <span
-                      className="relative flex size-[22px] shrink-0 items-center justify-center rounded-full border-2 border-muted-foreground/60"
+                      className="absolute top-2 right-2.5 flex size-5 items-center justify-center rounded-full border-2 border-muted-foreground/60"
                       aria-hidden="true"
                     >
                       <AnimatePresence initial={false}>
@@ -1586,7 +1624,7 @@ function App() {
                             transition={{ type: "spring", stiffness: 600, damping: 26 }}
                             className="absolute -inset-0.5 flex items-center justify-center rounded-full bg-primary text-primary-foreground"
                           >
-                            <Check className="size-[13px] stroke-[3.5]" />
+                            <Check className="size-3 stroke-[3.5]" />
                           </motion.span>
                         )}
                       </AnimatePresence>
@@ -1660,9 +1698,9 @@ function App() {
               >
                 <span className="flex items-center gap-2">
                   <Download className="size-4" />
-                  get the android app
+                  download for android
                 </span>
-                <span className="text-xs font-semibold opacity-70">apk</span>
+                <span className="text-xs font-semibold opacity-70">apk · v{APP_VERSION}</span>
               </a>
             )}
             <a

@@ -13,6 +13,8 @@ const buttonVariants = cva(
         pink: "bg-pink text-pink-foreground hover:brightness-105",
         secondary: "bg-card text-card-foreground hover:bg-secondary",
         raised: "bg-secondary text-secondary-foreground hover:brightness-110",
+        outline:
+          "border-[1.5px] border-border text-foreground hover:bg-secondary/60",
         ghost: "text-muted-foreground hover:text-foreground",
       },
       size: {
