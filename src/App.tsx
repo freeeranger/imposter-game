@@ -1,27 +1,23 @@
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { NumberStepper } from "@/components/ui/number-stepper";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { RollingNumber } from "@/components/ui/rolling-number";
+import { Sheet } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
-import { Checkbox } from "@/components/ui/checkbox";
-import { AnimatePresence, motion } from "framer-motion";
+import {
+  AnimatePresence,
+  MotionConfig,
+  motion,
+  useMotionValue,
+  useTransform,
+} from "motion/react";
+import type { Variants } from "motion/react";
 import type { LucideIcon } from "lucide-react";
 import {
+  ArrowRight,
+  Check,
+  ChevronRight,
   ExternalLink,
   Eye,
   EyeOff,
@@ -29,15 +25,12 @@ import {
   Info,
   Moon,
   Music,
-  Play,
   RotateCcw,
   Shuffle,
   Sun,
-  Users,
   VenetianMask,
   X,
 } from "lucide-react";
-import type { ButtonProps } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type CategoryTag = "new" | "updated";
@@ -77,29 +70,37 @@ const APP_VERSION = __APP_VERSION__;
 const CATEGORY_KEYS = Object.keys(CATEGORIES);
 const DEFAULT_CATEGORY = CATEGORY_KEYS[0] ?? "random";
 type Difficulty = "easy" | "hard" | "all";
-const DIFFICULTY_DESCRIPTIONS: Record<Difficulty, string> = {
-  easy: "Everyday words everyone knows.",
-  hard: "Trickier words that test your poker face.",
-  all: "A mix of obvious and niche words.",
+const DIFFICULTIES: Difficulty[] = ["easy", "hard", "all"];
+const DIFFICULTY_LABELS: Record<Difficulty, string> = {
+  easy: "easy",
+  hard: "hard",
+  all: "mix",
 };
-
-const CATEGORY_TAG_STYLES: Record<CategoryTag, string> = {
-  new: "bg-tag-new text-tag-new-foreground",
-  updated: "bg-tag-updated text-tag-updated-foreground",
+const DIFFICULTY_DESCRIPTIONS: Record<Difficulty, string> = {
+  easy: "everyday words everyone knows.",
+  hard: "trickier words that test your poker face.",
+  all: "a mix of obvious and niche words.",
 };
 
 const CategoryTagBadge = ({
   tag,
-  className,
+  onPrimary = false,
+  size = "sm",
 }: {
   tag: CategoryTag;
-  className?: string;
+  onPrimary?: boolean;
+  size?: "sm" | "md";
 }) => (
   <span
     className={cn(
-      "inline-flex shrink-0 items-center border border-border font-bold uppercase leading-none tracking-widest shadow-brutal-xs",
-      CATEGORY_TAG_STYLES[tag],
-      className,
+      "inline-flex shrink-0 items-center rounded-full font-bold uppercase tracking-[0.06em]",
+      size === "sm" ? "px-1.5 text-[9px] leading-[13px]" : "px-2 text-[10px] leading-4",
+      tag === "new" && !onPrimary && "bg-pink py-px text-pink-foreground",
+      tag === "new" && onPrimary && "bg-primary-foreground py-px text-[#ff4fa3]",
+      tag === "updated" &&
+        (onPrimary
+          ? "border-[1.5px] border-primary-foreground text-primary-foreground"
+          : "border-[1.5px] border-pink text-pink"),
     )}
   >
     {tag}
@@ -108,11 +109,120 @@ const CategoryTagBadge = ({
 
 const CategoryHint = ({ hint }: { hint?: string }) =>
   hint ? (
-    <div className="mx-auto flex max-w-xs items-center justify-center gap-2 border-2 border-border bg-tag-updated px-3 py-2 text-sm font-bold text-tag-updated-foreground shadow-brutal-sm">
-      <Music className="size-4 shrink-0" aria-hidden />
+    <div className="mx-auto flex max-w-xs items-center gap-2.5 rounded-2xl bg-card px-4 py-3 text-sm font-semibold">
+      <Music className="size-4 shrink-0 text-pink" aria-hidden />
       <span>{hint}</span>
     </div>
   ) : null;
+
+const RoundProgress = ({ current, total }: { current: number; total: number }) => (
+  <div className="flex gap-1.5" aria-hidden="true">
+    {Array.from({ length: total }, (_, index) => (
+      <span
+        key={index}
+        className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-secondary"
+      >
+        <motion.span
+          className={cn(
+            "absolute inset-0 origin-left rounded-full transition-colors duration-300",
+            index + 1 === current ? "bg-primary" : "bg-muted-foreground",
+          )}
+          initial={false}
+          animate={{ scaleX: index + 1 <= current ? 1 : 0 }}
+          transition={SOFT_SPRING}
+        />
+      </span>
+    ))}
+  </div>
+);
+
+const RoundHeader = ({
+  current,
+  total,
+  onEnd,
+}: {
+  current: number;
+  total: number;
+  onEnd: () => void;
+}) => (
+  <div className="flex flex-col gap-3.5">
+    <div className="flex h-11 items-center justify-between">
+      <Button variant="secondary" size="icon" onClick={onEnd} aria-label="End game">
+        <X className="size-[18px] stroke-[2.2]" />
+      </Button>
+      <span className="flex items-baseline gap-1 text-[15px] font-bold">
+        player <RollingNumber value={current} />
+        <span className="font-medium text-muted-foreground">of {total}</span>
+      </span>
+      <span className="size-11" aria-hidden="true" />
+    </div>
+    <RoundProgress current={current} total={total} />
+  </div>
+);
+
+const SWIPE_OFFSET = 110;
+const SWIPE_VELOCITY = 600;
+
+// The secret card: tilts with the finger and can be flicked away to pass the phone.
+const SwipeCard = ({
+  onSwipe,
+  children,
+}: {
+  onSwipe: (direction: 1 | -1) => void;
+  children: ReactNode;
+}) => {
+  const x = useMotionValue(0);
+  const rotate = useTransform(x, [-240, 240], [-14, 14]);
+
+  return (
+    <motion.div
+      style={{ x, rotate }}
+      drag="x"
+      dragConstraints={{ left: 0, right: 0 }}
+      dragElastic={0.9}
+      whileDrag={{ scale: 1.02 }}
+      onDragEnd={(_, info) => {
+        if (
+          Math.abs(info.offset.x) > SWIPE_OFFSET ||
+          Math.abs(info.velocity.x) > SWIPE_VELOCITY
+        ) {
+          onSwipe(info.offset.x > 0 ? 1 : -1);
+        }
+      }}
+      className="flex h-full w-full cursor-grab touch-pan-y flex-col justify-between rounded-[32px] bg-card p-6 shadow-[10px_10px_0_var(--pink)] active:cursor-grabbing"
+    >
+      {children}
+    </motion.div>
+  );
+};
+
+const SettingRow = ({
+  id,
+  title,
+  description,
+  children,
+}: {
+  id: string;
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) => (
+  <div className="flex min-h-[60px] items-center justify-between gap-3 py-2.5">
+    <label htmlFor={id} className="flex min-w-0 cursor-pointer flex-col gap-0.5">
+      <span className="text-[15px] font-semibold">{title}</span>
+      {description && (
+        <span className="text-[13px] text-muted-foreground">{description}</span>
+      )}
+    </label>
+    {children}
+  </div>
+);
+
+const wordSizeClass = (word: string) => {
+  if (word.length > 22) return "text-[26px]";
+  if (word.length > 14) return "text-[32px]";
+  return "text-[42px]";
+};
 
 const getCategoryWords = (category: Category, difficulty: Difficulty): string[] => {
   if (difficulty === "easy") return category.easy;
@@ -152,7 +262,7 @@ const DEFAULT_SETTINGS: PersistedSettings = {
   selectedCategory: DEFAULT_CATEGORY,
   selectedDifficulty: "all",
   randomizeStarter: true,
-  prankProbability: 10,
+  prankProbability: 5,
   revealFellowImposters: false,
   randomPool: Object.fromEntries(CATEGORY_KEYS.map((key) => [key, true])),
 };
@@ -225,20 +335,78 @@ function loadSettings(): PersistedSettings {
     return DEFAULT_SETTINGS;
   }
 }
-const PANEL_TRANSITION = { duration: 0.2, ease: [0.22, 1, 0.36, 1] as const };
-const PANEL_VARIANTS = {
-  initial: (direction: number) => ({
-    opacity: 0,
-    x: direction > 0 ? 30 : -30,
-    scale: 0.995,
-  }),
-  animate: { opacity: 1, x: 0, scale: 1, transition: PANEL_TRANSITION },
+const SPRING = { type: "spring", stiffness: 480, damping: 36 } as const;
+const SOFT_SPRING = { type: "spring", stiffness: 260, damping: 28 } as const;
+
+const STAGGER: Variants = {
+  initial: {},
+  animate: { transition: { staggerChildren: 0.045, delayChildren: 0.03 } },
+};
+const RISE: Variants = {
+  initial: { opacity: 0, y: 14 },
+  animate: { opacity: 1, y: 0, transition: SOFT_SPRING },
+};
+const FADE_OUT = { opacity: 0, transition: { duration: 0.14 } };
+
+const PASS_VARIANTS: Variants = {
+  initial: { opacity: 0, x: 48 },
+  animate: {
+    opacity: 1,
+    x: 0,
+    transition: { ...SOFT_SPRING, staggerChildren: 0.05 },
+  },
+  exit: { opacity: 0, scale: 0.96, transition: { duration: 0.14 } },
+};
+const PLAYER_POP: Variants = {
+  initial: { opacity: 0, scale: 0.6, rotate: -6 },
+  animate: {
+    opacity: 1,
+    scale: 1,
+    rotate: 0,
+    transition: { type: "spring", stiffness: 380, damping: 18 },
+  },
+};
+const CARD_VARIANTS: Variants = {
+  initial: { opacity: 0, rotateY: -85, rotate: -8, y: 40, scale: 0.9 },
+  animate: {
+    opacity: 1,
+    rotateY: 0,
+    rotate: -2,
+    y: 0,
+    scale: 1,
+    transition: { type: "spring", stiffness: 210, damping: 21 },
+  },
+  // Flies off toward the side it was swiped (left when the button is used).
   exit: (direction: number) => ({
     opacity: 0,
-    x: direction > 0 ? -24 : 24,
-    scale: 0.995,
-    transition: { duration: 0.14, ease: [0.4, 0, 1, 1] as const },
+    x: direction * 420,
+    y: -30,
+    rotate: direction * 22,
+    transition: { duration: 0.32, ease: [0.5, 0, 0.9, 0.5] as const },
   }),
+};
+const POP: Variants = {
+  initial: { opacity: 0, scale: 0.4, rotate: -20 },
+  animate: {
+    opacity: 1,
+    scale: 1,
+    rotate: 0,
+    transition: { type: "spring", stiffness: 420, damping: 16 },
+  },
+};
+const DROP_CARD: Variants = {
+  initial: { opacity: 0, y: -36, rotate: 7, scale: 0.9 },
+  animate: {
+    opacity: 1,
+    y: 0,
+    rotate: -1,
+    scale: 1,
+    transition: { type: "spring", stiffness: 260, damping: 15 },
+  },
+};
+const TILE: Variants = {
+  initial: { opacity: 0, y: 10, scale: 0.97 },
+  animate: { opacity: 1, y: 0, scale: 1, transition: SPRING },
 };
 
 const pickRandom = <T,>(items: T[]): T =>
@@ -265,16 +433,14 @@ const getUniqueCategoryWords = (
 
 function App() {
   const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof window === "undefined") return "light";
+    if (typeof window === "undefined") return "dark";
 
     const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
     if (savedTheme === "light" || savedTheme === "dark") {
       return savedTheme;
     }
 
-    return window.matchMedia("(prefers-color-scheme: dark)").matches
-      ? "dark"
-      : "light";
+    return "dark";
   });
   const [settings] = useState(loadSettings);
   const [gameState, setGameState] = useState<GameState>("setup");
@@ -313,26 +479,36 @@ function App() {
   );
   const [currentPlayer, setCurrentPlayer] = useState<number>(1);
   const [startingPlayer, setStartingPlayer] = useState<number | null>(null);
-  const [transitionDirection, setTransitionDirection] = useState<1 | -1>(1);
+  const [swipeDirection, setSwipeDirection] = useState<1 | -1>(-1);
   const [showInfoModal, setShowInfoModal] = useState<boolean>(false);
+  const [showCategorySheet, setShowCategorySheet] = useState<boolean>(false);
+  const [lastSingleCategory, setLastSingleCategory] = useState<string>(
+    settings.selectedCategory !== "random"
+      ? settings.selectedCategory
+      : DEFAULT_CATEGORY,
+  );
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute("content", theme === "dark" ? "#15111f" : "#f5f1fc");
     window.localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
 
   useEffect(() => {
-    if (!showInfoModal) return;
+    if (!showInfoModal && !showCategorySheet) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setShowInfoModal(false);
+        setShowCategorySheet(false);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [showInfoModal]);
+  }, [showInfoModal, showCategorySheet]);
 
   useEffect(() => {
     try {
@@ -465,12 +641,10 @@ function App() {
       setStartingPlayer(null);
     }
 
-    setTransitionDirection(1);
     setGameState("pass");
   };
 
   const nextTurn = () => {
-    setTransitionDirection(1);
     if (currentPlayer < playersCount) {
       setCurrentPlayer(currentPlayer + 1);
       setGameState("pass");
@@ -480,13 +654,34 @@ function App() {
   };
 
   const revealRole = () => {
-    setTransitionDirection(1);
     setGameState("reveal");
   };
 
   const resetToSetup = () => {
-    setTransitionDirection(-1);
     setGameState("setup");
+  };
+
+  const endGame = () => {
+    if (window.confirm("End this round and go back to setup?")) {
+      resetToSetup();
+    }
+  };
+
+  const pickSingleCategory = (key: string) => {
+    setSelectedCategory(key);
+    setLastSingleCategory(key);
+    // Let the selection pill glide to the new tile before the sheet drops away.
+    window.setTimeout(() => setShowCategorySheet(false), 240);
+  };
+
+  const passWithButton = () => {
+    setSwipeDirection(-1);
+    nextTurn();
+  };
+
+  const passWithSwipe = (direction: 1 | -1) => {
+    setSwipeDirection(direction);
+    nextTurn();
   };
 
   const resetSettings = () => {
@@ -519,27 +714,33 @@ function App() {
     gameState === "pass" || gameState === "reveal"
       ? `${gameState}-${currentPlayer}`
       : gameState;
+  const isInRound = gameState === "pass" || gameState === "reveal";
 
-  let primaryLabel = "Start Game";
-  let primaryIcon: LucideIcon = Play;
-  let primaryVariant: ButtonProps["variant"] = "default";
+  let primaryLabel = "let’s play";
+  let primaryIcon: LucideIcon = ArrowRight;
+  let primaryIconAtEnd = true;
   let primaryDisabled = isStartDisabled;
   let primaryAction = startGame;
 
   if (gameState === "pass") {
-    primaryLabel = "Reveal Role";
+    primaryLabel = `i’m player ${currentPlayer}, show me`;
     primaryIcon = Eye;
+    primaryIconAtEnd = false;
     primaryDisabled = false;
     primaryAction = revealRole;
   } else if (gameState === "reveal") {
-    primaryLabel = "Hide & Next";
+    primaryLabel =
+      currentPlayer < playersCount
+        ? `hide & pass to player ${currentPlayer + 1}`
+        : "hide & finish";
     primaryIcon = EyeOff;
-    primaryVariant = "default";
+    primaryIconAtEnd = false;
     primaryDisabled = false;
-    primaryAction = nextTurn;
+    primaryAction = passWithButton;
   } else if (gameState === "end") {
-    primaryLabel = "Play again";
+    primaryLabel = "play again";
     primaryIcon = RotateCcw;
+    primaryIconAtEnd = false;
     primaryDisabled = false;
     primaryAction = resetToSetup;
   }
@@ -560,611 +761,819 @@ function App() {
     ? imposterNumbers.filter((number) => number !== currentPlayer)
     : [];
 
+  const isRandomMix = selectedCategory === "random";
+  const selectedCategoryInfo = isRandomMix
+    ? undefined
+    : CATEGORIES[selectedCategory];
+  const randomPoolCount = CATEGORY_KEYS.filter((key) => randomPool[key]).length;
+  const activeCategoryInfo = CATEGORIES[activeCategory];
+  const canRevealFellows = impostersCount >= 2;
+
   return (
-    <div className="relative box-border flex h-dvh min-h-dvh w-full items-center justify-center overflow-hidden bg-background p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] transition-colors select-none">
-      {/* Subtle ambient tabletop dot grid */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 opacity-[0.025] dark:opacity-[0.04]"
-        style={{
-          backgroundImage:
-            "radial-gradient(var(--border) 1px, transparent 1px)",
-          backgroundSize: "24px 24px",
-        }}
-      />
-
-      <div className="absolute right-[max(1rem,env(safe-area-inset-right))] top-[max(1rem,env(safe-area-inset-top))] z-20 flex items-center gap-2 md:right-6 md:top-6">
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-9 w-9 border-2 shadow-brutal-sm"
-          onClick={() => setShowInfoModal(true)}
-          aria-label="Game information & rules"
-        >
-          <Info className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-9 w-9 border-2 shadow-brutal-sm"
-          onClick={() =>
-            setTheme((currentTheme) =>
-              currentTheme === "dark" ? "light" : "dark",
-            )
-          }
-          aria-label={
-            theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
-          }
-        >
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.span
-              key={theme}
-              initial={{ opacity: 0, rotate: -35, scale: 0.8 }}
-              animate={{
-                opacity: 1,
-                rotate: 0,
-                scale: 1,
-                transition: { duration: 0.16 },
-              }}
-              exit={{
-                opacity: 0,
-                rotate: 35,
-                scale: 0.8,
-                transition: { duration: 0.12 },
-              }}
-              className="inline-flex"
-            >
-              {theme === "dark" ? (
-                <Sun className="h-4 w-4" />
-              ) : (
-                <Moon className="h-4 w-4" />
+    <MotionConfig reducedMotion="user">
+      <div className="relative flex h-dvh w-full justify-center overflow-hidden bg-background text-foreground transition-colors select-none">
+        <div className="flex h-full w-full max-w-md flex-col px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] pl-[max(1.25rem,env(safe-area-inset-left))] pr-[max(1.25rem,env(safe-area-inset-right))]">
+          {/* Top bar: stays put while the content below changes */}
+          <div className="shrink-0">
+            <AnimatePresence mode="wait" initial={false}>
+              {gameState === "setup" && (
+                <motion.header
+                  key="setup-bar"
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0, transition: SOFT_SPRING }}
+                  exit={FADE_OUT}
+                  className="flex h-11 items-center justify-between"
+                >
+                  <h1 className="font-display text-[30px] font-extrabold leading-none tracking-[-0.03em]">
+                    imposter
+                  </h1>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      onClick={() => setShowInfoModal(true)}
+                      aria-label="How to play"
+                    >
+                      <Info className="size-[18px]" />
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      onClick={() =>
+                        setTheme((currentTheme) =>
+                          currentTheme === "dark" ? "light" : "dark",
+                        )
+                      }
+                      aria-label={
+                        theme === "dark"
+                          ? "Switch to light mode"
+                          : "Switch to dark mode"
+                      }
+                    >
+                      <AnimatePresence mode="wait" initial={false}>
+                        <motion.span
+                          key={theme}
+                          initial={{ opacity: 0, rotate: -90, scale: 0.6 }}
+                          animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                          exit={{ opacity: 0, rotate: 90, scale: 0.6 }}
+                          transition={SPRING}
+                          className="inline-flex"
+                        >
+                          {theme === "dark" ? (
+                            <Sun className="size-[18px]" />
+                          ) : (
+                            <Moon className="size-[18px]" />
+                          )}
+                        </motion.span>
+                      </AnimatePresence>
+                    </Button>
+                  </div>
+                </motion.header>
               )}
-            </motion.span>
-          </AnimatePresence>
-        </Button>
-      </div>
+              {isInRound && (
+                <motion.div
+                  key="round-bar"
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0, transition: SOFT_SPRING }}
+                  exit={FADE_OUT}
+                >
+                  <RoundHeader
+                    current={currentPlayer}
+                    total={playersCount}
+                    onEnd={endGame}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 10, scale: 0.99 }}
-        animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.22 } }}
-        className="mx-auto flex h-full w-full max-w-md items-center justify-center"
-      >
-        <Card
-          className="flex w-full flex-col overflow-hidden shadow-brutal-md transition-all duration-200"
-          style={{
-            minHeight: "min(38rem, calc(100dvh - 5rem))",
-            maxHeight: "calc(100dvh - 5rem)",
-          }}
-        >
-          <CardHeader className="text-center pb-4 pt-5 shrink-0 border-b-2 border-border">
-            <CardTitle className="text-2xl md:text-3xl font-black uppercase tracking-tight text-foreground">
-              Imposter Game
-            </CardTitle>
-            <CardDescription className="text-xs uppercase tracking-widest font-bold text-muted-foreground mt-0.5">
-              Pass the phone and spot the liar
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-1 flex-col min-h-0 overflow-y-auto overscroll-contain px-6 py-2">
-            <div className="my-auto flex w-full flex-col justify-center py-2">
-              <AnimatePresence
-                mode="wait"
-                initial={false}
-                custom={transitionDirection}
-              >
-                {gameState === "setup" && (
+          <main className="relative flex min-h-0 flex-1 flex-col [perspective:1200px]">
+            <AnimatePresence mode="wait" initial={false} custom={swipeDirection}>
+              {gameState === "setup" && (
+                <motion.div
+                  key="setup"
+                  variants={STAGGER}
+                  initial="initial"
+                  animate="animate"
+                  exit={FADE_OUT}
+                  className="-mx-5 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain px-5 pt-5 pb-2"
+                >
                   <motion.div
-                    key={panelKey}
-                    custom={transitionDirection}
-                    variants={PANEL_VARIANTS}
-                    initial="initial"
-                    animate="animate"
-                    exit="exit"
-                    className="w-full space-y-6 my-auto"
+                    variants={RISE}
+                    className="grid shrink-0 grid-cols-2 rounded-[28px] bg-card py-[18px]"
                   >
-                    <div className="grid grid-cols-2 gap-3.5">
-                      <div className="space-y-1.5">
-                        <Label
-                          htmlFor="players"
-                          className="inline-flex items-center gap-1.5"
-                        >
-                          <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span>Players</span>
-                        </Label>
-                        <NumberStepper
-                          id="players"
-                          min={3}
-                          max={20}
-                          value={playersCount}
-                          onChange={(value) => {
-                            setPlayersCount(value);
-                            if (impostersCount >= value) {
-                              setImpostersCount(Math.max(1, value - 1));
-                            }
-                          }}
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label
-                          htmlFor="imposters"
-                          className="inline-flex items-center gap-1.5"
-                        >
-                          <Users className="h-3.5 w-3.5 text-destructive" />
-                          <span>Imposters</span>
-                        </Label>
-                        <NumberStepper
-                          id="imposters"
-                          min={1}
-                          max={playersCount - 1}
-                          value={impostersCount}
-                          onChange={setImpostersCount}
-                        />
-                      </div>
+                    <div className="flex flex-col items-center gap-2.5 border-r border-border px-3">
+                      <label
+                        htmlFor="players"
+                        className="text-sm font-semibold text-muted-foreground"
+                      >
+                        players
+                      </label>
+                      <NumberStepper
+                        id="players"
+                        label="players"
+                        min={3}
+                        max={20}
+                        value={playersCount}
+                        onChange={(value) => {
+                          setPlayersCount(value);
+                          if (impostersCount >= value) {
+                            setImpostersCount(Math.max(1, value - 1));
+                          }
+                        }}
+                      />
                     </div>
+                    <div className="flex flex-col items-center gap-2.5 px-3">
+                      <label
+                        htmlFor="imposters"
+                        className="text-sm font-semibold text-muted-foreground"
+                      >
+                        imposters
+                      </label>
+                      <NumberStepper
+                        id="imposters"
+                        label="imposters"
+                        min={1}
+                        max={Math.max(1, playersCount - 1)}
+                        value={impostersCount}
+                        onChange={setImpostersCount}
+                        valueClassName="text-pink"
+                      />
+                    </div>
+                  </motion.div>
 
-                    <div className="space-y-4">
-                      <div className="space-y-1.5">
-                        <Label
-                          htmlFor="prank-probability"
-                          className="inline-flex items-center gap-1.5"
-                        >
-                          <VenetianMask className="h-3.5 w-3.5 text-primary" />
-                          <span>Prank Probability</span>
-                        </Label>
-                        <NumberStepper
-                          id="prank-probability"
-                          min={0}
-                          max={100}
-                          value={prankProbability}
-                          onChange={setPrankProbability}
-                          suffix="%"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="category">Category</Label>
-                        <Select
-                          value={selectedCategory}
-                          onValueChange={(value) =>
-                            setSelectedCategory(value as string | "random")
-                          }
-                        >
-                          <SelectTrigger id="category">
-                            <SelectValue placeholder="Select a category" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem
-                              value="random"
-                              className="font-semibold"
-                            >
-                              Random category
-                            </SelectItem>
-                            {Object.entries(CATEGORIES).map(([key, cat]) => (
-                              <SelectItem key={key} value={key}>
-                                <span className="inline-flex items-center gap-2">
-                                  {cat.label}
-                                  {cat.tag && (
-                                    <CategoryTagBadge
-                                      tag={cat.tag}
-                                      className="px-1.5 py-0.5 text-[10px]"
-                                    />
-                                  )}
-                                </span>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="difficulty">Word Difficulty</Label>
-                        <Select
-                          value={selectedDifficulty}
-                          onValueChange={(value) =>
-                            setSelectedDifficulty(value as Difficulty)
-                          }
-                        >
-                          <SelectTrigger id="difficulty">
-                            <SelectValue placeholder="Select word difficulty" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="easy">Easy</SelectItem>
-                            <SelectItem value="hard">Hard</SelectItem>
-                            <SelectItem value="all">All</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <p className="text-sm text-muted-foreground">
-                          {DIFFICULTY_DESCRIPTIONS[selectedDifficulty]}
-                        </p>
-                      </div>
-
-                      {selectedCategory === "random" && (
-                        <div className="space-y-2.5 border-2 border-border bg-muted/20 p-3.5 shadow-brutal-sm">
-                          <div className="flex items-center justify-between">
-                            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                              Include Categories
-                            </Label>
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setRandomPool(
-                                    Object.fromEntries(
-                                      CATEGORY_KEYS.map((k) => [k, true]),
-                                    ),
-                                  )
-                                }
-                                className="text-[11px] font-bold uppercase tracking-wider text-primary hover:underline cursor-pointer"
-                              >
-                                All
-                              </button>
-                              <span className="text-muted-foreground text-xs">
-                                /
+                  <motion.div variants={RISE} className="flex shrink-0 flex-col gap-2.5">
+                    <span className="text-sm font-semibold text-muted-foreground">
+                      category
+                    </span>
+                    <motion.button
+                      type="button"
+                      onClick={() => setShowCategorySheet(true)}
+                      aria-haspopup="dialog"
+                      whileTap={{ scale: 0.98 }}
+                      className="flex min-h-[84px] w-full cursor-pointer items-center justify-between gap-3 overflow-hidden rounded-3xl bg-card py-3.5 pr-3.5 pl-5 text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60"
+                    >
+                      <span className="relative flex min-w-0 flex-1 flex-col">
+                        <AnimatePresence mode="popLayout" initial={false}>
+                          <motion.span
+                            key={selectedCategory}
+                            initial={{ opacity: 0, y: 16 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -16 }}
+                            transition={SPRING}
+                            className="flex min-w-0 flex-col gap-1.5"
+                          >
+                            <span className="flex min-w-0 items-center gap-2.5">
+                              {isRandomMix && (
+                                <Shuffle className="size-5 shrink-0 text-pink" />
+                              )}
+                              <span className="truncate font-display text-[22px] font-extrabold lowercase tracking-[-0.02em] text-highlight">
+                                {isRandomMix
+                                  ? "random mix"
+                                  : (selectedCategoryInfo?.label ?? "pick one")}
                               </span>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setRandomPool(
-                                    Object.fromEntries(
-                                      CATEGORY_KEYS.map((k) => [k, false]),
-                                    ),
-                                  )
-                                }
-                                className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground hover:underline cursor-pointer"
-                              >
-                                None
-                              </button>
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
-                            {CATEGORY_KEYS.map((key) => {
-                              const isChecked = !!randomPool[key];
-                              return (
-                                <label
-                                  key={key}
-                                  htmlFor={`pool-${key}`}
-                                  className={cn(
-                                    "flex items-center gap-2 border border-border p-2 text-xs font-medium cursor-pointer transition-colors select-none",
-                                    isChecked
-                                      ? "bg-background text-foreground shadow-brutal-sm"
-                                      : "bg-muted/60 text-muted-foreground opacity-60 hover:opacity-100",
-                                  )}
-                                >
-                                  <Checkbox
-                                    id={`pool-${key}`}
-                                    checked={isChecked}
-                                    onCheckedChange={(checked) =>
-                                      setRandomPool((prev) => ({
-                                        ...prev,
-                                        [key]: checked === true,
-                                      }))
-                                    }
-                                  />
-                                  <span className="truncate flex-1 font-semibold">
-                                    {CATEGORIES[key].label}
-                                  </span>
-                                  {CATEGORIES[key].tag && (
-                                    <CategoryTagBadge
-                                      tag={CATEGORIES[key].tag}
-                                      className="px-1 py-0.5 text-[9px] tracking-wider"
-                                    />
-                                  )}
-                                </label>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                              {selectedCategoryInfo?.tag && (
+                                <CategoryTagBadge
+                                  tag={selectedCategoryInfo.tag}
+                                  size="md"
+                                />
+                              )}
+                            </span>
+                            <span className="flex items-baseline gap-1 text-[13px] text-muted-foreground">
+                              {isRandomMix ? (
+                                <>
+                                  picks from <RollingNumber value={randomPoolCount} /> of{" "}
+                                  {CATEGORY_KEYS.length}
+                                </>
+                              ) : (
+                                `1 of ${CATEGORY_KEYS.length} categories`
+                              )}
+                            </span>
+                          </motion.span>
+                        </AnimatePresence>
+                      </span>
+                      <span className="flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-secondary pr-3.5 pl-4 text-sm font-bold">
+                        change
+                        <ChevronRight className="size-4 stroke-[2.5]" />
+                      </span>
+                    </motion.button>
+                  </motion.div>
 
-                    <div className="flex items-center justify-between border-2 border-border p-3.5 bg-background shadow-brutal-sm">
-                      <div className="space-y-0.5 pr-3">
-                        <Label
-                          htmlFor="randomize-starter"
-                          className="text-sm font-bold tracking-tight normal-case cursor-pointer"
+                  <motion.div variants={RISE} className="flex shrink-0 flex-col gap-2.5">
+                    <span
+                      id="difficulty-label"
+                      className="text-sm font-semibold text-muted-foreground"
+                    >
+                      difficulty
+                    </span>
+                    <div
+                      role="radiogroup"
+                      aria-labelledby="difficulty-label"
+                      className="grid grid-cols-3 rounded-full bg-card p-1"
+                    >
+                      {DIFFICULTIES.map((difficulty) => {
+                        const isSelected = difficulty === selectedDifficulty;
+                        return (
+                          <button
+                            key={difficulty}
+                            type="button"
+                            role="radio"
+                            aria-checked={isSelected}
+                            onClick={() => setSelectedDifficulty(difficulty)}
+                            className={cn(
+                              "relative h-11 cursor-pointer rounded-full text-[15px] transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
+                              isSelected
+                                ? "font-bold text-primary-foreground"
+                                : "font-semibold text-foreground",
+                            )}
+                          >
+                            {isSelected && (
+                              <motion.span
+                                layoutId="difficulty-pill"
+                                transition={SPRING}
+                                className="absolute inset-0 rounded-full bg-primary"
+                              />
+                            )}
+                            <span className="relative">
+                              {DIFFICULTY_LABELS[difficulty]}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="relative h-5 overflow-hidden pl-1">
+                      <AnimatePresence mode="popLayout" initial={false}>
+                        <motion.p
+                          key={selectedDifficulty}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          transition={SPRING}
+                          className="text-[13px] text-muted-foreground"
                         >
-                          Randomize Starting Player
-                        </Label>
-                        <p className="text-xs text-muted-foreground leading-relaxed">
-                          Picks who speaks first so nobody hesitates.
-                        </p>
-                      </div>
+                          {DIFFICULTY_DESCRIPTIONS[selectedDifficulty]}
+                        </motion.p>
+                      </AnimatePresence>
+                    </div>
+                  </motion.div>
+
+                  <motion.div
+                    variants={RISE}
+                    className="flex shrink-0 flex-col divide-y divide-border rounded-[20px] bg-card pr-3 pl-[18px]"
+                  >
+                    <SettingRow id="randomize-starter" title="random first speaker">
                       <Switch
                         id="randomize-starter"
                         checked={randomizeStarter}
                         onCheckedChange={setRandomizeStarter}
                       />
-                    </div>
-
-                    {impostersCount >= 2 && (
-                      <div className="flex items-center justify-between border-2 border-border p-3.5 bg-background shadow-brutal-sm">
-                        <div className="space-y-0.5 pr-3">
-                          <Label
-                            htmlFor="fellow-imposters"
-                            className="text-sm font-bold tracking-tight normal-case cursor-pointer"
+                    </SettingRow>
+                    <AnimatePresence initial={false}>
+                      {canRevealFellows && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={SPRING}
+                          className="overflow-hidden"
+                        >
+                          <SettingRow
+                            id="fellow-imposters"
+                            title="imposters know each other"
+                            description="they see each other’s player numbers."
                           >
-                            Imposters Know Each Other
-                          </Label>
-                          <p className="text-xs text-muted-foreground leading-relaxed">
-                            Imposters see each other's player numbers.
+                            <Switch
+                              id="fellow-imposters"
+                              checked={revealFellowImposters}
+                              onCheckedChange={setRevealFellowImposters}
+                            />
+                          </SettingRow>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                    <SettingRow id="prank-probability" title="prank rounds">
+                      <NumberStepper
+                        id="prank-probability"
+                        label="prank chance"
+                        size="sm"
+                        min={0}
+                        max={100}
+                        step={5}
+                        value={prankProbability}
+                        onChange={setPrankProbability}
+                        suffix="%"
+                      />
+                    </SettingRow>
+                  </motion.div>
+
+                  <motion.div variants={RISE} className="flex shrink-0 justify-center">
+                    <Button variant="ghost" size="sm" onClick={resetSettings}>
+                      <RotateCcw className="size-3.5" />
+                      reset settings
+                    </Button>
+                  </motion.div>
+                </motion.div>
+              )}
+
+              {gameState === "pass" && (
+                <motion.div
+                  key={panelKey}
+                  variants={PASS_VARIANTS}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 text-center"
+                >
+                  <motion.span
+                    variants={RISE}
+                    className="text-base font-semibold text-muted-foreground"
+                  >
+                    pass the phone to
+                  </motion.span>
+                  <motion.p
+                    variants={PLAYER_POP}
+                    className="font-display text-6xl font-extrabold tracking-[-0.03em] text-highlight"
+                  >
+                    player {currentPlayer}
+                  </motion.p>
+                  <motion.p
+                    variants={RISE}
+                    className="max-w-[16rem] text-sm text-muted-foreground"
+                  >
+                    make sure nobody else is peeking.
+                  </motion.p>
+                </motion.div>
+              )}
+
+              {gameState === "reveal" && (
+                <motion.div
+                  key={panelKey}
+                  variants={STAGGER}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 py-5"
+                >
+                  <motion.div
+                    variants={CARD_VARIANTS}
+                    className="h-[min(420px,52dvh)] w-full max-w-[310px]"
+                  >
+                    <SwipeCard onSwipe={passWithSwipe}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold text-muted-foreground">
+                          {currentAssignment?.isImposter ? "your role" : "your word"}
+                        </span>
+                        <VenetianMask className="size-6 text-pink" aria-hidden />
+                      </div>
+                      {currentAssignment?.isImposter ? (
+                        <div className="flex flex-col items-center gap-2 text-center">
+                          <span className="text-base font-semibold">you are the</span>
+                          <p className="font-display text-[40px] font-extrabold leading-[1.05] tracking-[-0.03em] text-pink">
+                            imposter
                           </p>
                         </div>
-                        <Switch
-                          id="fellow-imposters"
-                          checked={revealFellowImposters}
-                          onCheckedChange={setRevealFellowImposters}
-                        />
+                      ) : (
+                        <p
+                          className={cn(
+                            "text-center font-display font-extrabold leading-[1.05] tracking-[-0.03em] break-words text-highlight",
+                            wordSizeClass(currentAssignment?.word ?? ""),
+                          )}
+                        >
+                          {currentAssignment?.word ?? "no word"}
+                        </p>
+                      )}
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="truncate rounded-full bg-secondary px-3.5 py-2 text-sm font-bold lowercase">
+                          {activeCategoryInfo?.label}
+                        </span>
+                        <span className="shrink-0 text-[13px] text-muted-foreground">
+                          {currentPlayer} / {playersCount}
+                        </span>
                       </div>
-                    )}
-
-                    <div className="flex justify-center pt-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={resetSettings}
-                        className="text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground"
-                      >
-                        <RotateCcw className="h-3.5 w-3.5 mr-1" />
-                        Reset settings
-                      </Button>
-                    </div>
+                    </SwipeCard>
                   </motion.div>
-                )}
 
-                {gameState === "pass" && (
-                  <motion.div
-                    key={panelKey}
-                    custom={transitionDirection}
-                    variants={PANEL_VARIANTS}
-                    initial="initial"
-                    animate="animate"
-                    exit="exit"
-                    className="w-full text-center space-y-6 py-4 my-auto"
-                  >
-                    <div className="inline-flex items-center gap-1.5 border border-border bg-muted px-3 py-1 text-xs font-bold uppercase tracking-widest text-muted-foreground select-none">
-                      <span>
-                        Player {currentPlayer} of {playersCount}
+                  {fellowImposters.length > 0 && (
+                    <motion.div
+                      variants={{ ...RISE, exit: FADE_OUT }}
+                      className="flex items-center gap-2 rounded-full bg-card px-4 py-2.5 text-sm font-semibold"
+                    >
+                      <span className="text-muted-foreground">
+                        {fellowImposters.length === 1
+                          ? "fellow imposter:"
+                          : "fellow imposters:"}
                       </span>
-                    </div>
-                    <div className="space-y-2">
-                      <h2 className="text-xl font-bold uppercase tracking-tight text-muted-foreground">
-                        Pass device to
-                      </h2>
-                      <p className="text-5xl font-black uppercase tracking-tighter text-primary">
-                        Player {currentPlayer}
-                      </p>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Make sure no one else is looking at the screen.
+                      <span className="text-pink">
+                        {fellowImposters
+                          .map((number) => `player ${number}`)
+                          .join(" · ")}
+                      </span>
+                    </motion.div>
+                  )}
+
+                  {activeCategoryInfo?.hint && (
+                    <motion.div variants={{ ...RISE, exit: FADE_OUT }}>
+                      <CategoryHint hint={activeCategoryInfo.hint} />
+                    </motion.div>
+                  )}
+                </motion.div>
+              )}
+
+              {gameState === "end" && (
+                <motion.div
+                  key="end"
+                  variants={STAGGER}
+                  initial="initial"
+                  animate="animate"
+                  exit={FADE_OUT}
+                  className="flex min-h-0 flex-1 flex-col items-center justify-center gap-7 text-center"
+                >
+                  <motion.span
+                    variants={POP}
+                    className="flex size-16 items-center justify-center rounded-full bg-card"
+                  >
+                    <VenetianMask className="size-8 text-pink" aria-hidden />
+                  </motion.span>
+                  <motion.div variants={RISE} className="flex flex-col gap-2">
+                    <h2 className="font-display text-4xl font-extrabold tracking-[-0.03em]">
+                      all clear
+                    </h2>
+                    <p className="mx-auto max-w-xs text-[15px] text-muted-foreground">
+                      everyone has seen their card. put the phone down and start
+                      talking.
                     </p>
                   </motion.div>
-                )}
-
-                {gameState === "reveal" && (
-                  <motion.div
-                    key={panelKey}
-                    custom={transitionDirection}
-                    variants={PANEL_VARIANTS}
-                    initial="initial"
-                    animate="animate"
-                    exit="exit"
-                    className="w-full text-center space-y-6 py-4 my-auto"
-                  >
-                    <div className="inline-flex items-center gap-1.5 border border-border bg-muted px-3 py-1 text-xs font-bold uppercase tracking-widest text-muted-foreground select-none">
-                      <span>
-                        Player {currentPlayer} of {playersCount}
+                  {startingPlayer && (
+                    <motion.div
+                      variants={DROP_CARD}
+                      className="w-full max-w-xs rounded-[28px] bg-card p-5 shadow-[8px_8px_0_var(--pink)]"
+                    >
+                      <span className="flex items-center justify-center gap-2 text-sm font-semibold text-muted-foreground">
+                        <Shuffle className="size-4 text-pink" aria-hidden />
+                        first to speak
                       </span>
-                    </div>
-
-                    {currentAssignment?.isImposter ? (
-                      <div className="space-y-4">
-                        <p className="text-4xl md:text-5xl font-black uppercase tracking-tight text-destructive">
-                          YOU ARE THE IMPOSTER
-                        </p>
-                        <p className="text-lg text-muted-foreground">
-                          Category:{" "}
-                          <span className="font-bold text-foreground">
-                            {CATEGORIES[activeCategory]?.label}
-                          </span>
-                        </p>
-                        <CategoryHint hint={CATEGORIES[activeCategory]?.hint} />
-                        {fellowImposters.length > 0 && (
-                          <div className="mt-3 border-2 border-border bg-muted/50 p-2.5 max-w-xs mx-auto shadow-brutal-sm">
-                            <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-                              {fellowImposters.length === 1
-                                ? "Fellow imposter"
-                                : "Fellow imposters"}
-                            </p>
-                            <p className="mt-0.5 text-base font-bold uppercase tracking-tight text-destructive">
-                              {fellowImposters
-                                .map((number) => `Player ${number}`)
-                                .join(" · ")}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <p className="text-4xl md:text-5xl font-black uppercase tracking-tight text-primary">
-                          {currentAssignment?.word ?? "No word"}
-                        </p>
-                        <p className="text-lg text-muted-foreground">
-                          Category:{" "}
-                          <span className="font-bold text-foreground">
-                            {CATEGORIES[activeCategory]?.label}
-                          </span>
-                        </p>
-                        <CategoryHint hint={CATEGORIES[activeCategory]?.hint} />
-                      </div>
-                    )}
-                  </motion.div>
-                )}
-
-                {gameState === "end" && (
-                  <motion.div
-                    key={panelKey}
-                    custom={transitionDirection}
-                    variants={PANEL_VARIANTS}
-                    initial="initial"
-                    animate="animate"
-                    exit="exit"
-                    className="w-full text-center space-y-6 py-4 my-auto"
-                  >
-                    <div className="space-y-2">
-                      <div className="inline-flex items-center justify-center p-3 border-2 border-border bg-primary/15 shadow-brutal-sm mx-auto select-none">
-                        <VenetianMask className="h-7 w-7 text-primary" />
-                      </div>
-                      <h2 className="text-3xl font-black uppercase tracking-tight text-primary">
-                        All clear
-                      </h2>
-                      <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                        Everyone has seen their card. Put the phone down and start talking.
+                      <p className="mt-2 font-display text-4xl font-extrabold tracking-[-0.03em] text-highlight">
+                        player {startingPlayer}
                       </p>
-                    </div>
-                    {startingPlayer && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 6 }}
-                        animate={{
-                          opacity: 1,
-                          y: 0,
-                          transition: { duration: 0.16, delay: 0.03 },
-                        }}
-                        className="mt-6 border-2 border-border bg-primary/10 p-4 shadow-brutal-sm"
-                      >
-                        <div className="flex items-center justify-center gap-2 mb-2">
-                          <Shuffle className="w-5 h-5 text-primary" />
-                          <p className="text-xs font-bold uppercase tracking-wider text-primary">
-                            First to speak
-                          </p>
-                        </div>
-                        <p className="text-2xl font-black uppercase tracking-tight text-foreground">
-                          Player {startingPlayer}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Gives the first clue.
-                        </p>
-                      </motion.div>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </CardContent>
-          <CardFooter className="shrink-0 flex-col border-t-2 border-border bg-card px-6 pb-6 pt-4">
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={`footer-${panelKey}`}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0, transition: { duration: 0.15 } }}
-                exit={{ opacity: 0, y: -8, transition: { duration: 0.1 } }}
-                className="w-full"
-              >
-                <Button
-                  onClick={primaryAction}
-                  className="h-14 w-full text-xl shadow-brutal-md hover:shadow-brutal active:translate-x-1.5 active:translate-y-1.5"
-                  size="lg"
-                  variant={primaryVariant}
-                  disabled={primaryDisabled}
-                >
-                  <PrimaryIcon className="mr-2 h-6 w-6" />
-                  {primaryLabel}
-                </Button>
-                {gameState === "setup" && primaryDisabled && (
-                  <p className="mt-2 text-center text-xs font-bold uppercase tracking-wider text-destructive">
-                    {impostersCount >= playersCount
-                      ? "Need more players than imposters"
-                      : "Pick at least one category to start"}
-                  </p>
-                )}
-              </motion.div>
+                      <p className="mt-1 text-[13px] text-muted-foreground">
+                        gives the first clue.
+                      </p>
+                    </motion.div>
+                  )}
+                </motion.div>
+              )}
             </AnimatePresence>
-          </CardFooter>
-        </Card>
-      </motion.div>
+          </main>
 
-      {/* Info & Rules Modal */}
-      <AnimatePresence>
-        {showInfoModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-background/80 backdrop-blur-xs"
-              onClick={() => setShowInfoModal(false)}
-            />
-            <motion.div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="info-modal-title"
-              initial={{ opacity: 0, scale: 0.95, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 8 }}
-              className="relative z-10 w-full max-w-sm border-2 border-border bg-card p-6 shadow-brutal-lg text-foreground space-y-5"
+          <footer className="shrink-0 pt-4">
+            <Button
+              onClick={primaryAction}
+              size="lg"
+              className="relative w-full overflow-hidden"
+              disabled={primaryDisabled}
             >
-              <div className="flex items-center justify-between border-b-2 border-border pb-3">
-                <div className="flex items-center gap-2">
-                  <VenetianMask className="h-5 w-5 text-primary" />
-                  <h3
-                    id="info-modal-title"
-                    className="font-black uppercase tracking-tight text-lg"
-                  >
-                    Imposter Game
-                  </h3>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowInfoModal(false)}
-                  aria-label="Close modal"
-                  className="h-8 w-8"
+              <AnimatePresence mode="popLayout" initial={false}>
+                <motion.span
+                  key={primaryLabel}
+                  initial={{ opacity: 0, y: 18 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -18 }}
+                  transition={SPRING}
+                  className="flex items-center gap-2"
                 >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <div className="space-y-3 text-xs text-muted-foreground">
-                <p className="font-bold uppercase tracking-wider text-foreground">
-                  How to play
-                </p>
-                <div className="space-y-2 leading-relaxed">
-                  <p>
-                    Pass the phone around so everyone can check their card in private.
-                  </p>
-                  <p>
-                    Most players see a secret word. The imposter only sees the category.
-                  </p>
-                  <p>
-                    Go around the room and say one clue each. Too obvious, and the imposter catches on. Too vague, and everyone votes you out.
-                  </p>
-                  <p>
-                    Once everyone has spoken, argue and point fingers.
-                  </p>
-                </div>
-              </div>
-
-              <div className="border-t-2 border-border pt-4 flex flex-col gap-2.5 text-xs">
-                <a
-                  href={githubRepoUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center justify-between border-2 border-border bg-muted p-2.5 font-bold uppercase tracking-wider text-foreground shadow-brutal-sm hover:bg-accent transition-colors select-none"
+                  {!primaryIconAtEnd && (
+                    <PrimaryIcon className="size-5 stroke-[2.4]" />
+                  )}
+                  {primaryLabel}
+                  {primaryIconAtEnd && (
+                    <PrimaryIcon className="size-[22px] stroke-[2.6]" />
+                  )}
+                </motion.span>
+              </AnimatePresence>
+            </Button>
+            <AnimatePresence initial={false}>
+              {gameState === "setup" && primaryDisabled && (
+                <motion.p
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={SPRING}
+                  className="overflow-hidden pt-2 text-center text-[13px] font-semibold text-pink"
                 >
-                  <span className="flex items-center gap-2">
-                    <Github className="h-4 w-4" />
-                    <span>Star on GitHub</span>
+                  {impostersCount >= playersCount
+                    ? "need more players than imposters."
+                    : "pick at least one category for the random mix."}
+                </motion.p>
+              )}
+            </AnimatePresence>
+          </footer>
+        </div>
+
+        {/* Category picker */}
+        <Sheet
+          open={showCategorySheet}
+          onClose={() => setShowCategorySheet(false)}
+          labelledBy="category-sheet-title"
+          header={
+            <div className="flex h-11 items-center justify-between">
+              <h2
+                id="category-sheet-title"
+                className="font-display text-[22px] font-extrabold tracking-[-0.02em]"
+              >
+                pick a category
+              </h2>
+              <Button
+                variant="raised"
+                size="icon"
+                onClick={() => setShowCategorySheet(false)}
+                aria-label="Close"
+              >
+                <X className="size-[18px] stroke-[2.2]" />
+              </Button>
+            </div>
+          }
+        >
+          <div
+            role="radiogroup"
+            aria-label="Category mode"
+            className="grid shrink-0 grid-cols-2 rounded-full bg-background p-1"
+          >
+            {[
+              { random: false, label: "one category" },
+              { random: true, label: "random mix" },
+            ].map((mode) => {
+              const isSelected = mode.random === isRandomMix;
+              return (
+                <button
+                  key={mode.label}
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  onClick={() =>
+                    setSelectedCategory(mode.random ? "random" : lastSingleCategory)
+                  }
+                  className={cn(
+                    "relative flex h-11 cursor-pointer items-center justify-center gap-2 rounded-full text-[15px] transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
+                    isSelected
+                      ? "font-bold text-primary-foreground"
+                      : "font-semibold text-foreground",
+                  )}
+                >
+                  {isSelected && (
+                    <motion.span
+                      layoutId="category-mode-pill"
+                      transition={SPRING}
+                      className="absolute inset-0 rounded-full bg-primary"
+                    />
+                  )}
+                  {mode.random && (
+                    <Shuffle
+                      className={cn(
+                        "relative size-4 transition-colors",
+                        !isSelected && "text-pink",
+                      )}
+                      aria-hidden
+                    />
+                  )}
+                  <span className="relative">{mode.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <AnimatePresence initial={false}>
+            {isRandomMix && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={SPRING}
+                className="shrink-0 overflow-hidden"
+              >
+                <div className="flex min-h-11 items-center justify-between">
+                  <span className="flex items-baseline gap-1 text-sm text-muted-foreground">
+                    picks from
+                    <span className="flex items-baseline gap-1 font-bold text-foreground">
+                      <RollingNumber value={randomPoolCount} /> of{" "}
+                      {CATEGORY_KEYS.length}
+                    </span>
                   </span>
-                  <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
-                </a>
-
-                <div className="flex items-center justify-between text-muted-foreground font-mono text-[11px] px-1 pt-1 select-none">
-                  <span>tjeneritz.se</span>
-                  <span>v{APP_VERSION}</span>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-11 font-bold text-highlight hover:text-highlight"
+                      onClick={() =>
+                        setRandomPool(
+                          Object.fromEntries(CATEGORY_KEYS.map((k) => [k, true])),
+                        )
+                      }
+                    >
+                      select all
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-11"
+                      onClick={() =>
+                        setRandomPool(
+                          Object.fromEntries(CATEGORY_KEYS.map((k) => [k, false])),
+                        )
+                      }
+                    >
+                      clear
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="-mx-5 min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-0.5">
+            <motion.div
+              variants={{
+                initial: {},
+                animate: { transition: { staggerChildren: 0.014, delayChildren: 0.08 } },
+              }}
+              initial="initial"
+              animate="animate"
+              className="grid grid-cols-2 gap-1.5"
+            >
+              {CATEGORY_KEYS.map((key) => {
+                const category = CATEGORIES[key];
+
+                if (!isRandomMix) {
+                  const isSelected = key === selectedCategory;
+                  return (
+                    <motion.button
+                      key={key}
+                      variants={TILE}
+                      whileTap={{ scale: 0.96 }}
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() => pickSingleCategory(key)}
+                      className={cn(
+                        "relative isolate flex h-[50px] cursor-pointer flex-col items-start justify-center gap-[3px] rounded-2xl bg-secondary px-3.5 text-left transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
+                        isSelected
+                          ? "text-primary-foreground"
+                          : "text-secondary-foreground",
+                      )}
+                    >
+                      {isSelected && (
+                        <motion.span
+                          layoutId="category-pill"
+                          transition={SPRING}
+                          className="absolute inset-0 -z-10 rounded-2xl bg-primary"
+                        />
+                      )}
+                      <span
+                        className={cn(
+                          "max-w-full truncate text-[15px] leading-tight lowercase",
+                          isSelected ? "font-bold" : "font-semibold",
+                        )}
+                      >
+                        {category.label}
+                      </span>
+                      {category.tag && (
+                        <CategoryTagBadge tag={category.tag} onPrimary={isSelected} />
+                      )}
+                    </motion.button>
+                  );
+                }
+
+                const isIncluded = !!randomPool[key];
+                return (
+                  <motion.button
+                    key={key}
+                    variants={TILE}
+                    whileTap={{ scale: 0.96 }}
+                    type="button"
+                    role="checkbox"
+                    aria-checked={isIncluded}
+                    onClick={() =>
+                      setRandomPool((prev) => ({
+                        ...prev,
+                        [key]: !isIncluded,
+                      }))
+                    }
+                    className={cn(
+                      "flex h-[50px] cursor-pointer items-center justify-between gap-2 rounded-2xl border-[1.5px] pr-3 pl-3.5 text-left transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
+                      isIncluded
+                        ? "border-transparent bg-secondary text-secondary-foreground"
+                        : "border-border bg-transparent text-muted-foreground",
+                    )}
+                  >
+                    <span className="flex min-w-0 flex-col items-start gap-[3px]">
+                      <span
+                        className={cn(
+                          "max-w-full truncate text-[15px] leading-tight lowercase",
+                          isIncluded ? "font-semibold" : "font-medium line-through",
+                        )}
+                      >
+                        {category.label}
+                      </span>
+                      {category.tag && <CategoryTagBadge tag={category.tag} />}
+                    </span>
+                    <span
+                      className="relative flex size-[22px] shrink-0 items-center justify-center rounded-full border-2 border-muted-foreground/60"
+                      aria-hidden="true"
+                    >
+                      <AnimatePresence initial={false}>
+                        {isIncluded && (
+                          <motion.span
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            exit={{ scale: 0 }}
+                            transition={{ type: "spring", stiffness: 600, damping: 26 }}
+                            className="absolute -inset-0.5 flex items-center justify-center rounded-full bg-primary text-primary-foreground"
+                          >
+                            <Check className="size-[13px] stroke-[3.5]" />
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
+                    </span>
+                  </motion.button>
+                );
+              })}
             </motion.div>
           </div>
-        )}
-      </AnimatePresence>
-    </div>
+
+          <Button
+            size="lg"
+            className="h-[52px] shrink-0 text-[17px]"
+            onClick={() => setShowCategorySheet(false)}
+          >
+            done
+          </Button>
+        </Sheet>
+
+        {/* How to play */}
+        <Sheet
+          open={showInfoModal}
+          onClose={() => setShowInfoModal(false)}
+          labelledBy="info-sheet-title"
+          className="gap-5"
+          header={
+            <div className="flex h-11 items-center justify-between">
+              <h2
+                id="info-sheet-title"
+                className="font-display text-[22px] font-extrabold tracking-[-0.02em]"
+              >
+                how to play
+              </h2>
+              <Button
+                variant="raised"
+                size="icon"
+                onClick={() => setShowInfoModal(false)}
+                aria-label="Close"
+              >
+                <X className="size-[18px] stroke-[2.2]" />
+              </Button>
+            </div>
+          }
+        >
+          <motion.ol
+            variants={STAGGER}
+            initial="initial"
+            animate="animate"
+            className="flex flex-col gap-3.5 overflow-y-auto text-[15px] leading-relaxed"
+          >
+            {[
+              "Pass the phone around so everyone can check their card in private.",
+              "Most players see a secret word. The imposter only sees the category.",
+              "Go around the room and say one clue each. Too obvious, and the imposter catches on. Too vague, and everyone votes you out.",
+              "Once everyone has spoken, argue and point fingers.",
+            ].map((step, index) => (
+              <motion.li key={step} variants={RISE} className="flex gap-3">
+                <span className="w-4 shrink-0 font-display text-base font-extrabold text-pink">
+                  {index + 1}
+                </span>
+                <span>{step}</span>
+              </motion.li>
+            ))}
+          </motion.ol>
+
+          <div className="flex shrink-0 flex-col gap-3">
+            <a
+              href={githubRepoUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="flex h-12 items-center justify-between rounded-full bg-secondary px-5 text-sm font-bold transition-[filter,transform] hover:brightness-110 active:scale-[0.98]"
+            >
+              <span className="flex items-center gap-2">
+                <Github className="size-4" />
+                star on github
+              </span>
+              <ExternalLink className="size-3.5 text-muted-foreground" />
+            </a>
+            <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
+              <span>tjeneritz.se</span>
+              <span>v{APP_VERSION}</span>
+            </div>
+          </div>
+        </Sheet>
+      </div>
+    </MotionConfig>
   );
 }
 

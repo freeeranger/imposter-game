@@ -1,106 +1,106 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "@fontsource-variable/space-grotesk";
+@import "@fontsource-variable/unbounded";
+@import "@fontsource-variable/dm-sans";
 
 @custom-variant dark (&:is(.dark *));
 
 /*
-  Clean brutalist theme (ported from freeranger/ui).
-  - Near-monochrome paper/ink palette with one loud accent: violet.
-  - Sharp 0px corners, thick ink borders, hard offset shadows (no blur).
-  - Typeface: Space Grotesk.
+  Neon Party theme.
+  - Dark violet ground, one action color (lime) and one accent (hot pink).
+  - Lime = tap this / selected. Pink = imposter, tags, decoration.
+  - Rounded pills and soft cards; Unbounded for display, DM Sans for UI.
 */
 
 :root {
-  --radius: 0rem;
+  --radius: 1.25rem;
 
-  /* Clean neutral light mode: crisp 0-chroma surfaces */
-  --background: oklch(0.96 0 0);
-  --foreground: oklch(0.145 0 0);
+  /* Light mode: pale lilac paper with ink text */
+  --background: #f5f1fc;
+  --foreground: #1a1426;
 
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card: #ffffff;
+  --card-foreground: #1a1426;
 
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
+  --popover: #ffffff;
+  --popover-foreground: #1a1426;
 
-  /* The only warm element: vibrant amber accent (>= 4.5:1 WCAG AA) */
-  --primary: oklch(0.58 0.19 55);
-  --primary-foreground: oklch(0.99 0 0);
+  --primary: #c6ff3d;
+  --primary-foreground: #15111f;
 
-  --secondary: oklch(0.94 0 0);
-  --secondary-foreground: oklch(0.145 0 0);
+  /* Lime is unreadable as text on white, so light mode highlights in olive */
+  --highlight: #3f6b00;
 
-  --muted: oklch(0.94 0 0);
-  --muted-foreground: oklch(0.48 0 0);
+  --secondary: #ebe4f7;
+  --secondary-foreground: #1a1426;
 
-  --accent: oklch(0.92 0 0);
-  --accent-foreground: oklch(0.145 0 0);
+  --muted: #ebe4f7;
+  --muted-foreground: #5f5675;
 
-  --destructive: oklch(0.60 0.22 25);
-  --destructive-foreground: oklch(0.99 0 0);
+  --accent: #ebe4f7;
+  --accent-foreground: #1a1426;
 
-  /* Crisp neutral ink outlines & pure black shadows */
-  --border: oklch(0.145 0 0);
-  --input: oklch(0.145 0 0);
-  --ring: oklch(0.58 0.19 55);
+  /* Hot pink, darkened in light mode so pink text stays readable */
+  --pink: #d1206f;
+  --pink-foreground: #ffffff;
 
-  --brutal-shadow: oklch(0 0 0);
+  --destructive: #d1206f;
+  --destructive-foreground: #ffffff;
 
-  /* Category tags: lime "new", electric blue "updated" */
-  --tag-new: oklch(0.86 0.2 135);
-  --tag-new-foreground: oklch(0.145 0 0);
-  --tag-updated: oklch(0.55 0.2 255);
-  --tag-updated-foreground: oklch(0.99 0 0);
+  --border: #ddd3ee;
+  --input: #ddd3ee;
+  --ring: #8a6cff;
+
+  --overlay: rgb(26 20 38 / 0.45);
 }
 
 .dark {
-  /* Clean neutral dark mode: noticeably brighter background so black shadows pop */
-  --background: oklch(0.28 0 0);
-  --foreground: oklch(0.96 0 0);
+  --background: #15111f;
+  --foreground: #f4eeff;
 
-  --card: oklch(0.20 0 0);
-  --card-foreground: oklch(0.96 0 0);
+  --card: #221b31;
+  --card-foreground: #f4eeff;
 
-  --popover: oklch(0.20 0 0);
-  --popover-foreground: oklch(0.96 0 0);
+  --popover: #221b31;
+  --popover-foreground: #f4eeff;
 
-  /* The only warm element: electric tactical amber accent */
-  --primary: oklch(0.78 0.18 68);
-  --primary-foreground: oklch(0.14 0 0);
+  --primary: #c6ff3d;
+  --primary-foreground: #15111f;
 
-  --secondary: oklch(0.27 0 0);
-  --secondary-foreground: oklch(0.96 0 0);
+  --highlight: #c6ff3d;
 
-  --muted: oklch(0.27 0 0);
-  --muted-foreground: oklch(0.70 0 0);
+  --secondary: #2e2542;
+  --secondary-foreground: #f4eeff;
 
-  --accent: oklch(0.30 0 0);
-  --accent-foreground: oklch(0.96 0 0);
+  --muted: #2e2542;
+  --muted-foreground: #b3a8c9;
 
-  --destructive: oklch(0.65 0.22 25);
-  --destructive-foreground: oklch(0.99 0 0);
+  --accent: #2e2542;
+  --accent-foreground: #f4eeff;
 
-  /* Clean structural borders & pure black drop shadow */
-  --border: oklch(0.44 0 0);
-  --input: oklch(0.44 0 0);
-  --ring: oklch(0.78 0.18 68);
+  --pink: #ff4fa3;
+  --pink-foreground: #15111f;
 
-  --brutal-shadow: oklch(0 0 0);
+  --destructive: #ff4fa3;
+  --destructive-foreground: #15111f;
 
-  --tag-new: oklch(0.86 0.2 135);
-  --tag-new-foreground: oklch(0.145 0 0);
-  --tag-updated: oklch(0.7 0.16 245);
-  --tag-updated-foreground: oklch(0.14 0 0);
+  --border: #3a3050;
+  --input: #3a3050;
+  --ring: #c6ff3d;
+
+  --overlay: rgb(12 9 18 / 0.75);
 }
 
 @theme inline {
-  --font-sans: "Space Grotesk Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "DM Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Unbounded Variable", "DM Sans Variable", ui-sans-serif, sans-serif;
 
-  --radius-sm: 0rem;
-  --radius-md: 0rem;
-  --radius-lg: 0rem;
-  --radius-xl: 0rem;
+  --radius-sm: 0.75rem;
+  --radius-md: 1rem;
+  --radius-lg: 1.25rem;
+  --radius-xl: 1.5rem;
+  --radius-2xl: 1.75rem;
+  --radius-3xl: 2rem;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -116,22 +116,15 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-highlight: var(--highlight);
+  --color-pink: var(--pink);
+  --color-pink-foreground: var(--pink-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-tag-new: var(--tag-new);
-  --color-tag-new-foreground: var(--tag-new-foreground);
-  --color-tag-updated: var(--tag-updated);
-  --color-tag-updated-foreground: var(--tag-updated-foreground);
-
-  /* hard offset shadows — no blur, no spread */
-  --shadow-brutal-xs: 1.5px 1.5px 0 0 var(--brutal-shadow);
-  --shadow-brutal-sm: 2px 2px 0 0 var(--brutal-shadow);
-  --shadow-brutal: 4px 4px 0 0 var(--brutal-shadow);
-  --shadow-brutal-md: 6px 6px 0 0 var(--brutal-shadow);
-  --shadow-brutal-lg: 8px 8px 0 0 var(--brutal-shadow);
+  --color-overlay: var(--overlay);
 }
 
 @layer base {

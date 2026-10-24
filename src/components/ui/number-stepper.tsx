@@ -1,21 +1,22 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { type LucideIcon, Minus, Plus } from "lucide-react";
+import { Minus, Plus } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { RollingNumber } from "@/components/ui/rolling-number";
 
 type NumberStepperProps = {
   id: string;
+  label: string;
   value: number;
   min: number;
   max: number;
   step?: number;
   onChange: (value: number) => void;
-  icon?: LucideIcon;
-  iconClassName?: string;
   suffix?: ReactNode;
+  size?: "lg" | "sm";
+  valueClassName?: string;
 };
 
 const clamp = (value: number, min: number, max: number) =>
@@ -23,17 +24,18 @@ const clamp = (value: number, min: number, max: number) =>
 
 function NumberStepper({
   id,
+  label,
   value,
   min,
   max,
   step = 1,
   onChange,
-  icon: Icon,
-  iconClassName,
   suffix,
+  size = "lg",
+  valueClassName,
 }: NumberStepperProps) {
   const [draftValue, setDraftValue] = useState<string | null>(null);
-  const displayValue = draftValue ?? String(value);
+  const isEditing = draftValue !== null;
 
   const updateValue = (nextValue: number) => {
     const clamped = clamp(nextValue, min, max);
@@ -42,30 +44,40 @@ function NumberStepper({
   };
 
   return (
-    <div className="flex items-center gap-2">
-      {Icon && (
-        <Icon className={cn("h-5 w-5 text-muted-foreground", iconClassName)} />
+    <div
+      className={cn(
+        "flex items-center gap-1",
+        size === "lg" ? "w-full justify-between" : "shrink-0",
       )}
-      <div className="flex flex-1 items-center gap-1 border-2 border-border bg-background p-1 shadow-brutal-sm">
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          className="h-8 w-8 shrink-0 border-2 border-border bg-muted text-foreground transition-all duration-75 hover:bg-foreground hover:text-background active:translate-x-0.5 active:translate-y-0.5 active:shadow-none shadow-none"
-          onClick={() => updateValue(value - step)}
-          disabled={value <= min}
-          aria-label={`Decrease ${id}`}
-        >
-          <Minus className="h-4 w-4 stroke-[2.5]" />
-        </Button>
-        <div className="relative flex-1">
-          <Input
+    >
+      <Button
+        type="button"
+        variant="raised"
+        size="icon"
+        onClick={() => updateValue(value - step)}
+        disabled={value <= min}
+        aria-label={`Fewer ${label}`}
+      >
+        <Minus className="size-5 stroke-[2.5]" />
+      </Button>
+      <div
+        className={cn(
+          "flex items-baseline justify-center font-display font-extrabold leading-none",
+          size === "lg" ? "min-w-0 flex-1 text-[2.75rem]" : "text-xl",
+          valueClassName,
+        )}
+      >
+        {/* The input stays for typing; while idle a rolling copy of the value sits on top of it. */}
+        <span className="relative inline-flex">
+          <input
             id={id}
             type="number"
+            inputMode="numeric"
             min={min}
             max={max}
             step={step}
-            value={displayValue}
+            value={draftValue ?? String(value)}
+            aria-label={label}
             onFocus={() => {
               if (draftValue === null) {
                 setDraftValue(String(value));
@@ -73,60 +85,57 @@ function NumberStepper({
             }}
             onBlur={() => {
               const currentText = draftValue ?? String(value);
-
-              if (currentText.trim() === "") {
-                setDraftValue(null);
-                return;
-              }
-
               const nextValue = Number.parseInt(currentText, 10);
-              if (Number.isNaN(nextValue)) {
-                setDraftValue(null);
-                return;
-              }
-
-              const clamped = clamp(nextValue, min, max);
               setDraftValue(null);
-              onChange(clamped);
-            }}
-            onChange={(event) => {
-              const nextText = event.target.value;
-              setDraftValue(nextText);
 
-              if (nextText.trim() === "") {
-                return;
-              }
-
-              const nextValue = Number.parseInt(nextText, 10);
-              if (Number.isNaN(nextValue)) {
+              if (currentText.trim() === "" || Number.isNaN(nextValue)) {
                 return;
               }
 
               onChange(clamp(nextValue, min, max));
             }}
+            onChange={(event) => {
+              const nextText = event.target.value;
+              setDraftValue(nextText);
+
+              const nextValue = Number.parseInt(nextText, 10);
+              if (nextText.trim() === "" || Number.isNaN(nextValue)) {
+                return;
+              }
+
+              onChange(clamp(nextValue, min, max));
+            }}
+            style={{ width: `${(draftValue ?? String(value)).length}ch` }}
             className={cn(
-              "h-8 border-0 bg-transparent text-center font-black text-lg md:text-base tabular-nums shadow-none [appearance:textfield] focus-visible:shadow-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
-              suffix ? "pr-8" : undefined,
+              "rounded-lg bg-transparent text-center transition-[width] duration-200 tabular-nums outline-none [appearance:textfield] focus-visible:ring-[3px] focus-visible:ring-ring/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+              !isEditing && "text-transparent caret-transparent",
             )}
           />
-          {suffix && (
-            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-medium text-muted-foreground">
-              {suffix}
+          {!isEditing && (
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 flex items-center justify-center"
+            >
+              <RollingNumber value={value} />
             </span>
           )}
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          className="h-8 w-8 shrink-0 border-2 border-border bg-muted text-foreground transition-all duration-75 hover:bg-foreground hover:text-background active:translate-x-0.5 active:translate-y-0.5 active:shadow-none shadow-none"
-          onClick={() => updateValue(value + step)}
-          disabled={value >= max}
-          aria-label={`Increase ${id}`}
-        >
-          <Plus className="h-4 w-4 stroke-[2.5]" />
-        </Button>
+        </span>
+        {suffix && (
+          <span className={size === "lg" ? "text-2xl" : "text-base"}>
+            {suffix}
+          </span>
+        )}
       </div>
+      <Button
+        type="button"
+        variant="raised"
+        size="icon"
+        onClick={() => updateValue(value + step)}
+        disabled={value >= max}
+        aria-label={`More ${label}`}
+      >
+        <Plus className="size-5 stroke-[2.5]" />
+      </Button>
     </div>
   );
 }
