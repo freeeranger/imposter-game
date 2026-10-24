@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { AnimatePresence, motion, useDragControls } from "motion/react";
 
+import { haptic } from "@/lib/native";
 import { cn } from "@/lib/utils";
 
 type SheetProps = {
@@ -62,6 +63,7 @@ function Sheet({
                 info.offset.y > DISMISS_OFFSET ||
                 info.velocity.y > DISMISS_VELOCITY
               ) {
+                haptic.tap();
                 onClose();
               }
             }}

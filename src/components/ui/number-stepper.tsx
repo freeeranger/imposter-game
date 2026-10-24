@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { Minus, Plus } from "lucide-react";
 
+import { haptic } from "@/lib/native";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { RollingNumber } from "@/components/ui/rolling-number";
@@ -39,6 +40,7 @@ function NumberStepper({
 
   const updateValue = (nextValue: number) => {
     const clamped = clamp(nextValue, min, max);
+    haptic.tap();
     setDraftValue(null);
     onChange(clamped);
   };

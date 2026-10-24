@@ -3,9 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
-const buildDate = new Date();
-const pad = (n: number) => String(n).padStart(2, "0");
-const BUILD_DATE = `${buildDate.getFullYear()}.${pad(buildDate.getMonth() + 1)}.${pad(buildDate.getDate())}`;
+import packageJson from "./package.json";
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -16,7 +14,7 @@ export default defineConfig({
     },
   },
   define: {
-    __APP_VERSION__: JSON.stringify(BUILD_DATE),
+    __APP_VERSION__: JSON.stringify(packageJson.version),
   },
   server: {
     host: true,

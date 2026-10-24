@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { NumberStepper } from "@/components/ui/number-stepper";
@@ -16,6 +16,7 @@ import type { Variants } from "motion/react";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowRight,
+  Download,
   Check,
   ChevronRight,
   ExternalLink,
@@ -31,6 +32,18 @@ import {
   VenetianMask,
   X,
 } from "lucide-react";
+import {
+  APK_DOWNLOAD_URL,
+  exitApp,
+  externalLinkTarget,
+  fetchLatestVersion,
+  haptic,
+  isNativeApp,
+  isNewerVersion,
+  onBackButton,
+  setKeepAwake,
+  setSystemBarsTheme,
+} from "@/lib/native";
 import { cn } from "@/lib/utils";
 
 type CategoryTag = "new" | "updated";
@@ -173,6 +186,7 @@ const SwipeCard = ({
 }) => {
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-240, 240], [-14, 14]);
+  const isPastThreshold = useRef(false);
 
   return (
     <motion.div
@@ -181,6 +195,14 @@ const SwipeCard = ({
       dragConstraints={{ left: 0, right: 0 }}
       dragElastic={0.9}
       whileDrag={{ scale: 1.02 }}
+      onDrag={(_, info) => {
+        // A small tick when letting go would pass the phone, and again if pulled back.
+        const isPast = Math.abs(info.offset.x) > SWIPE_OFFSET;
+        if (isPast !== isPastThreshold.current) {
+          isPastThreshold.current = isPast;
+          haptic.tap();
+        }
+      }}
       onDragEnd={(_, info) => {
         if (
           Math.abs(info.offset.x) > SWIPE_OFFSET ||
@@ -482,6 +504,7 @@ function App() {
   const [swipeDirection, setSwipeDirection] = useState<1 | -1>(-1);
   const [showInfoModal, setShowInfoModal] = useState<boolean>(false);
   const [showCategorySheet, setShowCategorySheet] = useState<boolean>(false);
+  const [updateVersion, setUpdateVersion] = useState<string | null>(null);
   const [lastSingleCategory, setLastSingleCategory] = useState<string>(
     settings.selectedCategory !== "random"
       ? settings.selectedCategory
@@ -494,7 +517,48 @@ function App() {
       .querySelector('meta[name="theme-color"]')
       ?.setAttribute("content", theme === "dark" ? "#15111f" : "#f5f1fc");
     window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+    setSystemBarsTheme(theme);
   }, [theme]);
+
+  // App only: offer the newest APK when GitHub has a newer release than this build.
+  useEffect(() => {
+    if (!isNativeApp) return;
+    let isCancelled = false;
+    void fetchLatestVersion().then((latestVersion) => {
+      if (!isCancelled && latestVersion && isNewerVersion(latestVersion, APP_VERSION)) {
+        setUpdateVersion(latestVersion);
+      }
+    });
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  // Keep the screen on while the phone is passed around.
+  useEffect(() => {
+    setKeepAwake(gameState !== "setup");
+  }, [gameState]);
+
+  // Android back button: close what's open, step out of a round, then leave the app.
+  useEffect(
+    () =>
+      onBackButton(() => {
+        if (showCategorySheet) {
+          setShowCategorySheet(false);
+        } else if (showInfoModal) {
+          setShowInfoModal(false);
+        } else if (gameState === "pass" || gameState === "reveal") {
+          if (window.confirm("End this round and go back to setup?")) {
+            setGameState("setup");
+          }
+        } else if (gameState === "end") {
+          setGameState("setup");
+        } else {
+          exitApp();
+        }
+      }),
+    [showCategorySheet, showInfoModal, gameState],
+  );
 
   useEffect(() => {
     if (!showInfoModal && !showCategorySheet) return;
@@ -641,19 +705,27 @@ function App() {
       setStartingPlayer(null);
     }
 
+    haptic.press();
     setGameState("pass");
   };
 
   const nextTurn = () => {
     if (currentPlayer < playersCount) {
+      haptic.tap();
       setCurrentPlayer(currentPlayer + 1);
       setGameState("pass");
     } else {
+      haptic.success();
       setGameState("end");
     }
   };
 
   const revealRole = () => {
+    if (playerAssignments[currentPlayer - 1]?.isImposter) {
+      haptic.thud();
+    } else {
+      haptic.press();
+    }
     setGameState("reveal");
   };
 
@@ -858,6 +930,25 @@ function App() {
                   exit={FADE_OUT}
                   className="-mx-5 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain px-5 pt-5 pb-2"
                 >
+                  {updateVersion && (
+                    <motion.a
+                      variants={RISE}
+                      href={APK_DOWNLOAD_URL}
+                      whileTap={{ scale: 0.98 }}
+                      className="flex shrink-0 items-center justify-between gap-3 rounded-[20px] bg-pink py-3 pr-3 pl-[18px] text-pink-foreground"
+                    >
+                      <span className="flex flex-col">
+                        <span className="text-[15px] font-bold">update available</span>
+                        <span className="text-[13px] font-medium opacity-80">
+                          v{updateVersion} is out
+                        </span>
+                      </span>
+                      <span className="flex h-11 items-center gap-1.5 rounded-full bg-pink-foreground px-4 text-sm font-bold text-pink">
+                        <Download className="size-4" />
+                        download
+                      </span>
+                    </motion.a>
+                  )}
                   <motion.div
                     variants={RISE}
                     className="grid shrink-0 grid-cols-2 rounded-[28px] bg-card py-[18px]"
@@ -979,7 +1070,10 @@ function App() {
                             type="button"
                             role="radio"
                             aria-checked={isSelected}
-                            onClick={() => setSelectedDifficulty(difficulty)}
+                            onClick={() => {
+                              haptic.tap();
+                              setSelectedDifficulty(difficulty);
+                            }}
                             className={cn(
                               "relative h-11 cursor-pointer rounded-full text-[15px] transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
                               isSelected
@@ -1309,9 +1403,10 @@ function App() {
                   type="button"
                   role="radio"
                   aria-checked={isSelected}
-                  onClick={() =>
-                    setSelectedCategory(mode.random ? "random" : lastSingleCategory)
-                  }
+                  onClick={() => {
+                    haptic.tap();
+                    setSelectedCategory(mode.random ? "random" : lastSingleCategory);
+                  }}
                   className={cn(
                     "relative flex h-11 cursor-pointer items-center justify-center gap-2 rounded-full text-[15px] transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
                     isSelected
@@ -1411,7 +1506,10 @@ function App() {
                       whileTap={{ scale: 0.96 }}
                       type="button"
                       aria-pressed={isSelected}
-                      onClick={() => pickSingleCategory(key)}
+                      onClick={() => {
+                        haptic.tap();
+                        pickSingleCategory(key);
+                      }}
                       className={cn(
                         "relative isolate flex h-[50px] cursor-pointer flex-col items-start justify-center gap-[3px] rounded-2xl bg-secondary px-3.5 text-left transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
                         isSelected
@@ -1450,12 +1548,13 @@ function App() {
                     type="button"
                     role="checkbox"
                     aria-checked={isIncluded}
-                    onClick={() =>
+                    onClick={() => {
+                      haptic.tap();
                       setRandomPool((prev) => ({
                         ...prev,
                         [key]: !isIncluded,
-                      }))
-                    }
+                      }));
+                    }}
                     className={cn(
                       "flex h-[50px] cursor-pointer items-center justify-between gap-2 rounded-2xl border-[1.5px] pr-3 pl-3.5 text-left transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
                       isIncluded
@@ -1554,9 +1653,21 @@ function App() {
           </motion.ol>
 
           <div className="flex shrink-0 flex-col gap-3">
+            {!isNativeApp && (
+              <a
+                href={APK_DOWNLOAD_URL}
+                className="flex h-12 items-center justify-between rounded-full bg-primary px-5 text-sm font-bold text-primary-foreground transition-[filter,transform] hover:brightness-105 active:scale-[0.98]"
+              >
+                <span className="flex items-center gap-2">
+                  <Download className="size-4" />
+                  get the android app
+                </span>
+                <span className="text-xs font-semibold opacity-70">apk</span>
+              </a>
+            )}
             <a
               href={githubRepoUrl}
-              target="_blank"
+              target={externalLinkTarget}
               rel="noreferrer"
               className="flex h-12 items-center justify-between rounded-full bg-secondary px-5 text-sm font-bold transition-[filter,transform] hover:brightness-110 active:scale-[0.98]"
             >

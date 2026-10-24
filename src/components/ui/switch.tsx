@@ -1,13 +1,18 @@
 import * as React from "react";
 import * as SwitchPrimitives from "@radix-ui/react-switch";
 
+import { haptic } from "@/lib/native";
 import { cn } from "@/lib/utils";
 
 const Switch = React.forwardRef<
   React.ElementRef<typeof SwitchPrimitives.Root>,
   React.ComponentPropsWithoutRef<typeof SwitchPrimitives.Root>
->(({ className, ...props }, ref) => (
+>(({ className, onCheckedChange, ...props }, ref) => (
   <SwitchPrimitives.Root
+    onCheckedChange={(checked) => {
+      haptic.tap();
+      onCheckedChange?.(checked);
+    }}
     className={cn(
       "peer inline-flex h-8 w-[52px] shrink-0 cursor-pointer items-center rounded-full p-1 transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-border",
       className,
