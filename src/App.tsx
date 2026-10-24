@@ -39,18 +39,20 @@ import {
 import type { ButtonProps } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+type CategoryTag = "new" | "updated";
+
 type CategoryFile = {
   name: string;
   easy: string[];
   hard: string[];
-  wip?: boolean;
+  tag?: CategoryTag;
 };
 
 type Category = {
   label: string;
   easy: string[];
   hard: string[];
-  wip: boolean;
+  tag?: CategoryTag;
 };
 
 const categoryFiles = import.meta.glob<{ default: CategoryFile }>(
@@ -62,8 +64,8 @@ const CATEGORIES: Record<string, Category> = Object.fromEntries(
   Object.entries(categoryFiles).map(([path, module]) => {
     const fileName = path.split("/").pop() ?? path;
     const key = fileName.replace(".json", "");
-    const { name, easy, hard, wip } = module.default;
-    return [key, { label: name, easy, hard, wip: wip === true }];
+    const { name, easy, hard, tag } = module.default;
+    return [key, { label: name, easy, hard, tag }];
   }),
 );
 
@@ -77,6 +79,29 @@ const DIFFICULTY_DESCRIPTIONS: Record<Difficulty, string> = {
   hard: "Trickier words that test your poker face.",
   all: "A mix of obvious and niche words.",
 };
+
+const CATEGORY_TAG_STYLES: Record<CategoryTag, string> = {
+  new: "bg-tag-new text-tag-new-foreground",
+  updated: "bg-tag-updated text-tag-updated-foreground",
+};
+
+const CategoryTagBadge = ({
+  tag,
+  className,
+}: {
+  tag: CategoryTag;
+  className?: string;
+}) => (
+  <span
+    className={cn(
+      "inline-flex shrink-0 items-center border border-border font-bold uppercase leading-none tracking-widest shadow-brutal-xs",
+      CATEGORY_TAG_STYLES[tag],
+      className,
+    )}
+  >
+    {tag}
+  </span>
+);
 
 const getCategoryWords = (category: Category, difficulty: Difficulty): string[] => {
   if (difficulty === "easy") return category.easy;
@@ -705,10 +730,11 @@ function App() {
                               <SelectItem key={key} value={key}>
                                 <span className="inline-flex items-center gap-2">
                                   {cat.label}
-                                  {cat.wip && (
-                                    <span className="inline-flex shrink-0 items-center border border-border bg-muted px-1.5 py-0.5 text-[10px] font-bold uppercase leading-none tracking-widest text-muted-foreground">
-                                      WIP
-                                    </span>
+                                  {cat.tag && (
+                                    <CategoryTagBadge
+                                      tag={cat.tag}
+                                      className="px-1.5 py-0.5 text-[10px]"
+                                    />
                                   )}
                                 </span>
                               </SelectItem>
@@ -803,10 +829,11 @@ function App() {
                                   <span className="truncate flex-1 font-semibold">
                                     {CATEGORIES[key].label}
                                   </span>
-                                  {CATEGORIES[key].wip && (
-                                    <span className="shrink-0 border border-border bg-muted px-1 py-0.5 text-[9px] font-bold uppercase leading-none text-muted-foreground">
-                                      WIP
-                                    </span>
+                                  {CATEGORIES[key].tag && (
+                                    <CategoryTagBadge
+                                      tag={CATEGORIES[key].tag}
+                                      className="px-1 py-0.5 text-[9px] tracking-wider"
+                                    />
                                   )}
                                 </label>
                               );

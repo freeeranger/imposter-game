@@ -1,5 +1,6 @@
 {
   "name": "Sports",
+  "tag": "updated",
   "easy": [
     "Football",
     "Basketball",
@@ -32,7 +33,8 @@
     "Darts",
     "Floorball",
     "Climbing",
-    "Crossfit"
+    "Crossfit",
+    "American Football"
   ],
   "hard": [
     "Ski Jumping",
@@ -51,6 +53,26 @@
     "Padel",
     "Lacrosse",
     "Triathlon",
-    "Long Jump"
+    "Long Jump",
+    "Bandy",
+    "Biathlon",
+    "Cross-Country Skiing",
+    "Figure Skating",
+    "Bobsleigh",
+    "Pole Vault",
+    "High Jump",
+    "Javelin",
+    "Marathon",
+    "Diving",
+    "Kayaking",
+    "Kitesurfing",
+    "Sumo",
+    "Taekwondo",
+    "Kickboxing",
+    "Horse Racing",
+    "Show Jumping",
+    "Orienteering",
+    "Pickleball",
+    "Parkour"
   ]
 }

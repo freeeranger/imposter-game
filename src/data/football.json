@@ -1,5 +1,6 @@
 {
   "name": "Football",
+  "tag": "updated",
   "easy": [
     "VAR",
     "La Liga",
@@ -23,7 +24,10 @@
     "Zlatan",
     "AIK",
     "Hammarby",
-    "Djurgården"
+    "Djurgården",
+    "Liverpool",
+    "Manchester United",
+    "Chelsea"
   ],
   "hard": [
     "Serie A",
@@ -34,6 +38,29 @@
     "Offside",
     "Conference League",
     "Europa League",
-    "Transfer Window"
+    "Transfer Window",
+    "Hat-trick",
+    "Penalty Shootout",
+    "Red Card",
+    "Free Kick",
+    "Clean Sheet",
+    "Bicycle Kick",
+    "Ballon d'Or",
+    "El Clásico",
+    "Juventus",
+    "AC Milan",
+    "Inter",
+    "Borussia Dortmund",
+    "Ajax",
+    "Malmö FF",
+    "IFK Göteborg",
+    "Jürgen Klopp",
+    "Carlo Ancelotti",
+    "Mohamed Salah",
+    "Harry Kane",
+    "Lamine Yamal",
+    "Alexander Isak",
+    "Viktor Gyökeres",
+    "Jabulani"
   ]
 }

@@ -1,5 +1,6 @@
 {
   "name": "Music",
+  "tag": "updated",
   "easy": [
     "Grisch",
     "Roadtrip",
@@ -33,6 +34,14 @@
     "Tiktok",
     "Autotune",
     "Guitar",
-    "EDM"
+    "EDM",
+    "Christmas",
+    "Phonk",
+    "Techno",
+    "Lo-fi",
+    "Jazz",
+    "One-Hit Wonders",
+    "Pregame",
+    "Heartbreak"
   ]
 }
