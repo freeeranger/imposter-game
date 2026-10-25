@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import licenseText from "../LICENSE?raw";
 import type { CSSProperties, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
@@ -316,10 +323,51 @@ const SettingRow = ({
   </div>
 );
 
-const wordSizeClass = (word: string) => {
-  if (word.length > 22) return "text-[26px]";
-  if (word.length > 14) return "text-[32px]";
-  return "text-[42px]";
+const wordStartSize = (word: string) => {
+  if (word.length > 22) return 26;
+  if (word.length > 14) return 32;
+  return 42;
+};
+const MIN_WORD_SIZE = 14;
+
+// Lines only break between words; a single word too wide for the card shrinks to fit instead.
+const FitWord = ({ word, className }: { word: string; className?: string }) => {
+  const ref = useRef<HTMLParagraphElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const fit = () => {
+      const parts = el.querySelectorAll("span");
+      let size = wordStartSize(word);
+      parts.forEach((part) => (part.style.whiteSpace = "nowrap"));
+      el.style.fontSize = `${size}px`;
+      while (el.scrollWidth > el.clientWidth && size > MIN_WORD_SIZE) {
+        size -= 1;
+        el.style.fontSize = `${size}px`;
+      }
+      // Last resort for absurdly long words: break them rather than spill off the card.
+      if (el.scrollWidth > el.clientWidth) {
+        parts.forEach((part) => (part.style.whiteSpace = "normal"));
+      }
+    };
+    fit();
+    // The display font may still be loading, and it is much wider than the fallback.
+    void document.fonts.ready.then(fit);
+    const observer = new ResizeObserver(fit);
+    if (el.parentElement) observer.observe(el.parentElement);
+    return () => observer.disconnect();
+  }, [word]);
+  return (
+    <p ref={ref} className={cn("[overflow-wrap:anywhere]", className)}>
+      {/* nowrap per word keeps "Counter-Strike" from splitting at its hyphen */}
+      {word.split(" ").map((part, index) => (
+        <Fragment key={index}>
+          {index > 0 && " "}
+          <span>{part}</span>
+        </Fragment>
+      ))}
+    </p>
+  );
 };
 
 const getCategoryWords = (
@@ -2046,14 +2094,10 @@ function App() {
                             </p>
                           </div>
                         ) : (
-                          <p
-                            className={cn(
-                              "text-center font-display font-extrabold leading-[1.05] tracking-[-0.03em] break-words text-highlight",
-                              wordSizeClass(currentAssignment?.word ?? ""),
-                            )}
-                          >
-                            {currentAssignment?.word ?? "no word"}
-                          </p>
+                          <FitWord
+                            word={currentAssignment?.word ?? "no word"}
+                            className="text-center font-display font-extrabold leading-[1.05] tracking-[-0.03em] text-balance hyphens-none text-highlight"
+                          />
                         )}
                         <div className="flex items-center justify-between gap-3">
                           <span className="truncate rounded-full bg-secondary px-3.5 py-2 text-sm font-bold lowercase">
