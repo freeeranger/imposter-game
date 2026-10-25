@@ -124,12 +124,25 @@ const loadCustomCategories = (): CustomCategory[] => {
       window.localStorage.getItem(CUSTOM_CATEGORIES_STORAGE_KEY) ?? "[]",
     );
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (item): item is CustomCategory =>
-        typeof item?.id === "string" &&
-        typeof item?.name === "string" &&
-        Array.isArray(item?.words),
-    );
+    // Storage can be old or hand-edited: keep only usable words and the first of any repeated id.
+    const seenIds = new Set<string>();
+    return parsed.flatMap((item): CustomCategory[] => {
+      if (
+        typeof item?.id !== "string" ||
+        typeof item?.name !== "string" ||
+        !Array.isArray(item?.words) ||
+        seenIds.has(item.id)
+      ) {
+        return [];
+      }
+      const words = (item.words as unknown[])
+        .filter((word): word is string => typeof word === "string")
+        .map((word) => word.trim())
+        .filter(Boolean);
+      if (words.length === 0) return [];
+      seenIds.add(item.id);
+      return [{ id: item.id, name: item.name, words }];
+    });
   } catch {
     return [];
   }
@@ -486,6 +499,8 @@ type PersistedSettings = {
   playersCount: number;
   impostersCount: number;
   selectedCategory: string;
+  // The single category to go back to when leaving random mix.
+  lastSingleCategory: string;
   selectedDifficulty: Difficulty;
   randomizeStarter: boolean;
   prankProbability: number;
@@ -497,6 +512,7 @@ const DEFAULT_SETTINGS: PersistedSettings = {
   playersCount: 4,
   impostersCount: 1,
   selectedCategory: DEFAULT_CATEGORY,
+  lastSingleCategory: DEFAULT_CATEGORY,
   selectedDifficulty: "all",
   randomizeStarter: true,
   prankProbability: 5,
@@ -531,13 +547,20 @@ function loadSettings(): PersistedSettings {
       parsed.selectedDifficulty === "all"
         ? parsed.selectedDifficulty
         : DEFAULT_SETTINGS.selectedDifficulty;
+    const customCategoryMap = toCategoryMap(loadCustomCategories());
+    const isKnownCategory = (key: unknown): key is string =>
+      typeof key === "string" &&
+      Boolean(CATEGORIES[key] || customCategoryMap[key]);
     const category =
       parsed.selectedCategory === "random" ||
-      (typeof parsed.selectedCategory === "string" &&
-        (CATEGORIES[parsed.selectedCategory] ||
-          toCategoryMap(loadCustomCategories())[parsed.selectedCategory]))
+      isKnownCategory(parsed.selectedCategory)
         ? parsed.selectedCategory
         : DEFAULT_SETTINGS.selectedCategory;
+    const lastSingleCategory = isKnownCategory(parsed.lastSingleCategory)
+      ? parsed.lastSingleCategory
+      : category !== "random"
+        ? category
+        : DEFAULT_SETTINGS.lastSingleCategory;
     return {
       playersCount: players,
       impostersCount: clampInt(
@@ -547,6 +570,7 @@ function loadSettings(): PersistedSettings {
         DEFAULT_SETTINGS.impostersCount,
       ),
       selectedCategory: category,
+      lastSingleCategory,
       selectedDifficulty: difficulty,
       randomizeStarter:
         typeof parsed.randomizeStarter === "boolean"
@@ -868,11 +892,7 @@ function App() {
     }
   }, [hapticsOn]);
   const [lastSingleCategory, setLastSingleCategory] = useState<string>(() =>
-    visibleOr(
-      settings.selectedCategory !== "random"
-        ? settings.selectedCategory
-        : DEFAULT_CATEGORY,
-    ),
+    visibleOr(settings.lastSingleCategory),
   );
 
   const setInterfacePref = (key: keyof InterfacePrefs, value: boolean) => {
@@ -1124,6 +1144,7 @@ function App() {
           playersCount,
           impostersCount,
           selectedCategory,
+          lastSingleCategory,
           selectedDifficulty,
           randomizeStarter,
           prankProbability,
@@ -1138,6 +1159,7 @@ function App() {
     playersCount,
     impostersCount,
     selectedCategory,
+    lastSingleCategory,
     selectedDifficulty,
     randomizeStarter,
     prankProbability,
@@ -1175,7 +1197,12 @@ function App() {
     const shouldUsePrank = prankProbability > 0 && rollChance(prankProbability);
 
     if (shouldUsePrank) {
-      const availablePranks: PrankMode[] = ["everyone-imposter", "no-imposter"];
+      const availablePranks: PrankMode[] = ["no-imposter"];
+
+      // Imposters who know each other would notice nobody is listed and smell the prank.
+      if (!(revealFellowImposters && impostersCount >= 2)) {
+        availablePranks.push("everyone-imposter");
+      }
 
       if (categoryWords.length >= playersCount) {
         availablePranks.push("different-words");
@@ -1419,6 +1446,9 @@ function App() {
     setCustomCategories((categories) =>
       categories.filter((category) => category.id !== id),
     );
+    setRandomPool((pool) =>
+      Object.fromEntries(Object.entries(pool).filter(([item]) => item !== key)),
+    );
     const remaining = allCategoryKeys.filter((item) => item !== key);
     const fallback = remaining[0] ?? DEFAULT_CATEGORY;
     if (selectedCategory === key) setSelectedCategory(fallback);
@@ -1444,6 +1474,7 @@ function App() {
     setPlayersCount(DEFAULT_SETTINGS.playersCount);
     setImpostersCount(DEFAULT_SETTINGS.impostersCount);
     setSelectedCategory(visibleOr(DEFAULT_SETTINGS.selectedCategory));
+    setLastSingleCategory(visibleOr(DEFAULT_CATEGORY));
     setSelectedDifficulty(DEFAULT_SETTINGS.selectedDifficulty);
     setRandomizeStarter(DEFAULT_SETTINGS.randomizeStarter);
     setPrankProbability(DEFAULT_SETTINGS.prankProbability);
@@ -2311,7 +2342,9 @@ function App() {
                       ? "need more players than imposters."
                       : !hasCategories
                         ? "make a category to play."
-                        : "pick at least one category for the random mix."}
+                        : isRandomMix
+                          ? "pick at least one category for the random mix."
+                          : "this category has no words to play with."}
                   </motion.p>
                 )}
               </AnimatePresence>
