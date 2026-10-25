@@ -352,6 +352,39 @@ type PlayerAssignment = {
 
 const THEME_STORAGE_KEY = "imposter-game-theme";
 const HAPTICS_STORAGE_KEY = "imposter-game-haptics";
+const INTERFACE_STORAGE_KEY = "imposter-game-interface";
+
+// Kept apart from game settings so "Reset game settings" leaves them alone.
+type InterfacePrefs = {
+  hideInfo: boolean;
+  hideCustomCategories: boolean;
+  hideBuiltinCategories: boolean;
+};
+
+const DEFAULT_INTERFACE_PREFS: InterfacePrefs = {
+  hideInfo: false,
+  hideCustomCategories: false,
+  hideBuiltinCategories: false,
+};
+
+const loadInterfacePrefs = (): InterfacePrefs => {
+  try {
+    const parsed = JSON.parse(
+      window.localStorage.getItem(INTERFACE_STORAGE_KEY) ?? "{}",
+    ) as Partial<InterfacePrefs>;
+    const prefs = { ...DEFAULT_INTERFACE_PREFS };
+    for (const key of Object.keys(prefs) as (keyof InterfacePrefs)[]) {
+      if (typeof parsed[key] === "boolean") prefs[key] = parsed[key];
+    }
+    // Hiding both would leave nothing to play with.
+    if (prefs.hideCustomCategories && prefs.hideBuiltinCategories) {
+      prefs.hideCustomCategories = false;
+    }
+    return prefs;
+  } catch {
+    return DEFAULT_INTERFACE_PREFS;
+  }
+};
 const AUTO_UPDATE_STORAGE_KEY = "imposter-game-auto-update";
 const DISMISSED_UPDATE_STORAGE_KEY = "imposter-game-dismissed-update";
 const SYSTEM_DARK_QUERY = "(prefers-color-scheme: dark)";
@@ -640,10 +673,30 @@ function App() {
     () => ({ ...CATEGORIES, ...toCategoryMap(customCategories) }),
     [customCategories],
   );
-  const customCategoryKeys = customCategories.map(
-    (category) => CUSTOM_KEY_PREFIX + category.id,
-  );
-  const allCategoryKeys = [...CATEGORY_KEYS, ...customCategoryKeys];
+  const [interfacePrefs, setInterfacePrefs] =
+    useState<InterfacePrefs>(loadInterfacePrefs);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        INTERFACE_STORAGE_KEY,
+        JSON.stringify(interfacePrefs),
+      );
+    } catch {
+      // ignore storage write errors (e.g. private mode)
+    }
+  }, [interfacePrefs]);
+  const visibleCategoryKeys = (prefs: InterfacePrefs) => ({
+    builtin: prefs.hideBuiltinCategories ? [] : CATEGORY_KEYS,
+    custom: prefs.hideCustomCategories
+      ? []
+      : customCategories.map((category) => CUSTOM_KEY_PREFIX + category.id),
+  });
+  const { builtin: builtinCategoryKeys, custom: customCategoryKeys } =
+    visibleCategoryKeys(interfacePrefs);
+  const allCategoryKeys = [...builtinCategoryKeys, ...customCategoryKeys];
+  // A hidden category can't stay picked; fall back to the first visible one.
+  const visibleOr = (key: string, keys = allCategoryKeys) =>
+    keys.includes(key) ? key : (keys[0] ?? key);
 
   useEffect(() => {
     try {
@@ -663,7 +716,10 @@ function App() {
     settings.impostersCount,
   );
   const [selectedCategory, setSelectedCategory] = useState<string | "random">(
-    settings.selectedCategory,
+    () =>
+      settings.selectedCategory === "random"
+        ? "random"
+        : visibleOr(settings.selectedCategory),
   );
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>(
     settings.selectedDifficulty,
@@ -763,11 +819,28 @@ function App() {
       // ignore storage write errors (e.g. private mode)
     }
   }, [hapticsOn]);
-  const [lastSingleCategory, setLastSingleCategory] = useState<string>(
-    settings.selectedCategory !== "random"
-      ? settings.selectedCategory
-      : DEFAULT_CATEGORY,
+  const [lastSingleCategory, setLastSingleCategory] = useState<string>(() =>
+    visibleOr(
+      settings.selectedCategory !== "random"
+        ? settings.selectedCategory
+        : DEFAULT_CATEGORY,
+    ),
   );
+
+  const setInterfacePref = (key: keyof InterfacePrefs, value: boolean) => {
+    const nextPrefs = { ...interfacePrefs, [key]: value };
+    const next = visibleCategoryKeys(nextPrefs);
+    const nextKeys = [...next.builtin, ...next.custom];
+    setInterfacePrefs(nextPrefs);
+    if (selectedCategory !== "random") {
+      setSelectedCategory(visibleOr(selectedCategory, nextKeys));
+    }
+    setLastSingleCategory(visibleOr(lastSingleCategory, nextKeys));
+  };
+
+  const isSelectedHidden =
+    selectedCategory !== "random" &&
+    !allCategoryKeys.includes(selectedCategory);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -1035,7 +1108,7 @@ function App() {
               getUniqueCategoryWords(allCategories[key], selectedDifficulty)
                 .length > 0,
           )
-        : allCategories[selectedCategory]
+        : allCategoryKeys.includes(selectedCategory)
           ? [selectedCategory]
           : [];
 
@@ -1298,8 +1371,10 @@ function App() {
     setCustomCategories((categories) =>
       categories.filter((category) => category.id !== id),
     );
-    if (selectedCategory === key) setSelectedCategory(DEFAULT_CATEGORY);
-    if (lastSingleCategory === key) setLastSingleCategory(DEFAULT_CATEGORY);
+    const remaining = allCategoryKeys.filter((item) => item !== key);
+    const fallback = remaining[0] ?? DEFAULT_CATEGORY;
+    if (selectedCategory === key) setSelectedCategory(fallback);
+    if (lastSingleCategory === key) setLastSingleCategory(fallback);
     setShowDeleteConfirm(false);
     setIsEditorOpen(false);
   };
@@ -1320,7 +1395,7 @@ function App() {
   const resetSettings = () => {
     setPlayersCount(DEFAULT_SETTINGS.playersCount);
     setImpostersCount(DEFAULT_SETTINGS.impostersCount);
-    setSelectedCategory(DEFAULT_SETTINGS.selectedCategory);
+    setSelectedCategory(visibleOr(DEFAULT_SETTINGS.selectedCategory));
     setSelectedDifficulty(DEFAULT_SETTINGS.selectedDifficulty);
     setRandomizeStarter(DEFAULT_SETTINGS.randomizeStarter);
     setPrankProbability(DEFAULT_SETTINGS.prankProbability);
@@ -1338,7 +1413,7 @@ function App() {
           getCategoryWords(allCategories[key], selectedDifficulty).length > 0,
       )) ||
     (selectedCategory !== "random" &&
-      (!allCategories[selectedCategory] ||
+      (isSelectedHidden ||
         getCategoryWords(allCategories[selectedCategory], selectedDifficulty)
           .length === 0)) ||
     impostersCount >= playersCount;
@@ -1395,9 +1470,10 @@ function App() {
     : [];
 
   const isRandomMix = selectedCategory === "random";
-  const selectedCategoryInfo = isRandomMix
-    ? undefined
-    : allCategories[selectedCategory];
+  const selectedCategoryInfo =
+    isRandomMix || isSelectedHidden
+      ? undefined
+      : allCategories[selectedCategory];
   const randomPoolCount = allCategoryKeys.filter(isInPool).length;
   const numberPicker = {
     players: {
@@ -1597,14 +1673,16 @@ function App() {
                       imposter
                     </h1>
                     <div className="-mr-2.5 flex">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setShowInfoModal(true)}
-                        aria-label="How to play"
-                      >
-                        <Info className="size-5" />
-                      </Button>
+                      {!interfacePrefs.hideInfo && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setShowInfoModal(true)}
+                          aria-label="How to play"
+                        >
+                          <Info className="size-5" />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
@@ -2187,7 +2265,9 @@ function App() {
                   >
                     {impostersCount >= playersCount
                       ? "need more players than imposters."
-                      : "pick at least one category for the random mix."}
+                      : !hasCategories
+                        ? "make a category to play."
+                        : "pick at least one category for the random mix."}
                   </motion.p>
                 )}
               </AnimatePresence>
@@ -2335,26 +2415,33 @@ function App() {
                 animate="animate"
                 className="grid grid-cols-2 gap-1.5"
               >
-                {CATEGORY_KEYS.map(renderCategoryTile)}
+                {builtinCategoryKeys.map(renderCategoryTile)}
               </motion.div>
 
-              <div className="mt-5 flex flex-col gap-2.5 pb-1">
-                <span className="px-1 text-[13px] font-semibold text-muted-foreground">
-                  Your categories
-                </span>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {customCategoryKeys.map(renderCategoryTile)}
-                  <motion.button
-                    type="button"
-                    whileTap={{ scale: 0.96 }}
-                    onClick={() => openCategoryEditor()}
-                    className="flex h-[54px] cursor-pointer items-center gap-2 rounded-2xl border-[1.5px] border-dashed border-pink/70 px-3.5 text-left text-[15px] font-semibold text-pink outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60"
-                  >
-                    <Plus className="size-4 stroke-[2.6]" />
-                    new category
-                  </motion.button>
+              {!interfacePrefs.hideCustomCategories && (
+                <div
+                  className={cn(
+                    "flex flex-col gap-2.5 pb-1",
+                    builtinCategoryKeys.length > 0 && "mt-5",
+                  )}
+                >
+                  <span className="px-1 text-[13px] font-semibold text-muted-foreground">
+                    Your categories
+                  </span>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {customCategoryKeys.map(renderCategoryTile)}
+                    <motion.button
+                      type="button"
+                      whileTap={{ scale: 0.96 }}
+                      onClick={() => openCategoryEditor()}
+                      className="flex h-[54px] cursor-pointer items-center gap-2 rounded-2xl border-[1.5px] border-dashed border-pink/70 px-3.5 text-left text-[15px] font-semibold text-pink outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60"
+                    >
+                      <Plus className="size-4 stroke-[2.6]" />
+                      new category
+                    </motion.button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <Button
@@ -2801,6 +2888,59 @@ function App() {
                       </button>
                     );
                   })}
+                </div>
+              </motion.section>
+
+              <motion.section variants={RISE} className="flex flex-col gap-2.5">
+                <span className="px-1 text-[13px] font-semibold text-muted-foreground">
+                  Interface
+                </span>
+                <div className="flex flex-col divide-y divide-border/70 rounded-[24px] bg-card pr-3 pl-[18px]">
+                  <SettingRow id="hide-info" title="Hide info button">
+                    <Switch
+                      id="hide-info"
+                      checked={interfacePrefs.hideInfo}
+                      onCheckedChange={(value) =>
+                        setInterfacePref("hideInfo", value)
+                      }
+                    />
+                  </SettingRow>
+                  <SettingRow
+                    id="hide-builtin"
+                    title="Hide built-in categories"
+                    description={
+                      interfacePrefs.hideCustomCategories
+                        ? "Show your categories to hide these"
+                        : undefined
+                    }
+                  >
+                    <Switch
+                      id="hide-builtin"
+                      checked={interfacePrefs.hideBuiltinCategories}
+                      disabled={interfacePrefs.hideCustomCategories}
+                      onCheckedChange={(value) =>
+                        setInterfacePref("hideBuiltinCategories", value)
+                      }
+                    />
+                  </SettingRow>
+                  <SettingRow
+                    id="hide-custom"
+                    title="Hide your categories"
+                    description={
+                      interfacePrefs.hideBuiltinCategories
+                        ? "Show built-in categories to hide these"
+                        : undefined
+                    }
+                  >
+                    <Switch
+                      id="hide-custom"
+                      checked={interfacePrefs.hideCustomCategories}
+                      disabled={interfacePrefs.hideBuiltinCategories}
+                      onCheckedChange={(value) =>
+                        setInterfacePref("hideCustomCategories", value)
+                      }
+                    />
+                  </SettingRow>
                 </div>
               </motion.section>
 
