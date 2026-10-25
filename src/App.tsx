@@ -25,6 +25,7 @@ import {
   Github,
   Info,
   Moon,
+  Settings,
   Music,
   RotateCcw,
   Shuffle,
@@ -37,10 +38,12 @@ import {
   exitApp,
   externalLinkTarget,
   fetchLatestVersion,
+  hideSplashScreen,
   haptic,
   isNativeApp,
   isNewerVersion,
   onBackButton,
+  setHapticsEnabled,
   setKeepAwake,
   setSystemBarsTheme,
 } from "@/lib/native";
@@ -267,6 +270,12 @@ type PlayerAssignment = {
 };
 
 const THEME_STORAGE_KEY = "imposter-game-theme";
+const HAPTICS_STORAGE_KEY = "imposter-game-haptics";
+
+type NumberPickerKind = "players" | "imposters" | "prank";
+const PRANK_OPTIONS = [0, 5, 10, 15, 20, 25, 30, 40, 50, 75, 100];
+const range = (from: number, to: number) =>
+  Array.from({ length: Math.max(0, to - from + 1) }, (_, index) => from + index);
 const SETTINGS_STORAGE_KEY = "imposter-game-settings";
 
 type PersistedSettings = {
@@ -508,6 +517,31 @@ function App() {
   const [showInfoModal, setShowInfoModal] = useState<boolean>(false);
   const [showCategorySheet, setShowCategorySheet] = useState<boolean>(false);
   const [updateVersion, setUpdateVersion] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [isNumberPickerOpen, setIsNumberPickerOpen] = useState<boolean>(false);
+  // Kept after closing so the sheet still has content while it animates away.
+  const [numberPickerKind, setNumberPickerKind] =
+    useState<NumberPickerKind>("players");
+  const [hapticsOn, setHapticsOn] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem(HAPTICS_STORAGE_KEY) !== "off";
+    } catch {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    hideSplashScreen();
+  }, []);
+
+  useEffect(() => {
+    setHapticsEnabled(hapticsOn);
+    try {
+      window.localStorage.setItem(HAPTICS_STORAGE_KEY, hapticsOn ? "on" : "off");
+    } catch {
+      // ignore storage write errors (e.g. private mode)
+    }
+  }, [hapticsOn]);
   const [lastSingleCategory, setLastSingleCategory] = useState<string>(
     settings.selectedCategory !== "random"
       ? settings.selectedCategory
@@ -546,7 +580,11 @@ function App() {
   useEffect(
     () =>
       onBackButton(() => {
-        if (showCategorySheet) {
+        if (isNumberPickerOpen) {
+          setIsNumberPickerOpen(false);
+        } else if (showSettings) {
+          setShowSettings(false);
+        } else if (showCategorySheet) {
           setShowCategorySheet(false);
         } else if (showInfoModal) {
           setShowInfoModal(false);
@@ -560,22 +598,26 @@ function App() {
           exitApp();
         }
       }),
-    [showCategorySheet, showInfoModal, gameState],
+    [isNumberPickerOpen, showSettings, showCategorySheet, showInfoModal, gameState],
   );
 
   useEffect(() => {
-    if (!showInfoModal && !showCategorySheet) return;
+    if (!showInfoModal && !showCategorySheet && !showSettings && !isNumberPickerOpen) {
+      return;
+    }
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setShowInfoModal(false);
         setShowCategorySheet(false);
+        setShowSettings(false);
+        setIsNumberPickerOpen(false);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [showInfoModal, showCategorySheet]);
+  }, [showInfoModal, showCategorySheet, showSettings, isNumberPickerOpen]);
 
   useEffect(() => {
     try {
@@ -759,6 +801,19 @@ function App() {
     nextTurn();
   };
 
+  const applyPlayersCount = (value: number) => {
+    setPlayersCount(value);
+    if (impostersCount >= value) {
+      setImpostersCount(Math.max(1, value - 1));
+    }
+  };
+
+  const openNumberPicker = (kind: NumberPickerKind) => {
+    haptic.tap();
+    setNumberPickerKind(kind);
+    setIsNumberPickerOpen(true);
+  };
+
   const resetSettings = () => {
     setPlayersCount(DEFAULT_SETTINGS.playersCount);
     setImpostersCount(DEFAULT_SETTINGS.impostersCount);
@@ -841,6 +896,29 @@ function App() {
     ? undefined
     : CATEGORIES[selectedCategory];
   const randomPoolCount = CATEGORY_KEYS.filter((key) => randomPool[key]).length;
+  const numberPicker = {
+    players: {
+      title: "players",
+      options: range(3, 20),
+      value: playersCount,
+      apply: applyPlayersCount,
+      suffix: "",
+    },
+    imposters: {
+      title: "imposters",
+      options: range(1, Math.max(1, playersCount - 1)),
+      value: impostersCount,
+      apply: setImpostersCount,
+      suffix: "",
+    },
+    prank: {
+      title: "prank rounds",
+      options: PRANK_OPTIONS,
+      value: prankProbability,
+      apply: setPrankProbability,
+      suffix: "%",
+    },
+  }[numberPickerKind];
   const selectedWordCount = selectedCategoryInfo
     ? getUniqueCategoryWords(selectedCategoryInfo, selectedDifficulty).length
     : 0;
@@ -853,7 +931,7 @@ function App() {
         <div className="flex h-full w-full max-w-md flex-col px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] pl-[max(1.25rem,env(safe-area-inset-left))] pr-[max(1.25rem,env(safe-area-inset-right))]">
           {/* Top bar: stays put while the content below changes */}
           <div className="shrink-0">
-            <AnimatePresence mode="wait" initial={false}>
+            <AnimatePresence mode="wait">
               {gameState === "setup" && (
                 <motion.header
                   key="setup-bar"
@@ -877,33 +955,11 @@ function App() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() =>
-                        setTheme((currentTheme) =>
-                          currentTheme === "dark" ? "light" : "dark",
-                        )
-                      }
-                      aria-label={
-                        theme === "dark"
-                          ? "Switch to light mode"
-                          : "Switch to dark mode"
-                      }
+                      onClick={() => setShowSettings(true)}
+                      aria-label="Settings"
+                      className="[&_svg]:transition-transform [&_svg]:duration-300 hover:[&_svg]:rotate-45"
                     >
-                      <AnimatePresence mode="wait" initial={false}>
-                        <motion.span
-                          key={theme}
-                          initial={{ opacity: 0, rotate: -90, scale: 0.6 }}
-                          animate={{ opacity: 1, rotate: 0, scale: 1 }}
-                          exit={{ opacity: 0, rotate: 90, scale: 0.6 }}
-                          transition={SPRING}
-                          className="inline-flex"
-                        >
-                          {theme === "dark" ? (
-                            <Sun className="size-5" />
-                          ) : (
-                            <Moon className="size-5" />
-                          )}
-                        </motion.span>
-                      </AnimatePresence>
+                      <Settings className="size-5" />
                     </Button>
                   </div>
                 </motion.header>
@@ -926,7 +982,7 @@ function App() {
           </div>
 
           <main className="relative flex min-h-0 flex-1 flex-col [perspective:1200px]">
-            <AnimatePresence mode="wait" initial={false} custom={swipeDirection}>
+            <AnimatePresence mode="wait" custom={swipeDirection}>
               {gameState === "setup" && (
                 <motion.div
                   key="setup"
@@ -972,12 +1028,8 @@ function App() {
                         min={3}
                         max={20}
                         value={playersCount}
-                        onChange={(value) => {
-                          setPlayersCount(value);
-                          if (impostersCount >= value) {
-                            setImpostersCount(Math.max(1, value - 1));
-                          }
-                        }}
+                        onChange={applyPlayersCount}
+                        onPick={() => openNumberPicker("players")}
                       />
                     </div>
                     <div className="flex flex-col items-center gap-2 px-3.5">
@@ -994,6 +1046,7 @@ function App() {
                         max={Math.max(1, playersCount - 1)}
                         value={impostersCount}
                         onChange={setImpostersCount}
+                        onPick={() => openNumberPicker("imposters")}
                         valueClassName="text-pink"
                       />
                     </div>
@@ -1152,7 +1205,6 @@ function App() {
                           <SettingRow
                             id="fellow-imposters"
                             title="Imposters know each other"
-                            description="They see each other’s player numbers."
                           >
                             <Switch
                               id="fellow-imposters"
@@ -1173,20 +1225,10 @@ function App() {
                         step={5}
                         value={prankProbability}
                         onChange={setPrankProbability}
+                        onPick={() => openNumberPicker("prank")}
                         suffix="%"
                       />
                     </SettingRow>
-                  </motion.div>
-
-                  <motion.div variants={RISE} className="flex shrink-0 justify-center">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-[13px] text-muted-foreground/80"
-                      onClick={resetSettings}
-                    >
-                      Reset settings
-                    </Button>
                   </motion.div>
                 </motion.div>
               )}
@@ -1341,7 +1383,11 @@ function App() {
             </AnimatePresence>
           </main>
 
-          <footer className="shrink-0 pt-4">
+          <motion.footer
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0, transition: { ...SOFT_SPRING, delay: 0.12 } }}
+            className="shrink-0 pt-4"
+          >
             <Button
               onClick={primaryAction}
               size="lg"
@@ -1382,7 +1428,7 @@ function App() {
                 </motion.p>
               )}
             </AnimatePresence>
-          </footer>
+          </motion.footer>
         </div>
 
         {/* Category picker */}
@@ -1660,12 +1706,13 @@ function App() {
                 how to play
               </h2>
               <Button
-                variant="raised"
+                variant="ghost"
                 size="icon"
+                className="-mr-2.5"
                 onClick={() => setShowInfoModal(false)}
                 aria-label="Close"
               >
-                <X className="size-[18px] stroke-[2.2]" />
+                <X className="size-5 stroke-[2.2]" />
               </Button>
             </div>
           }
@@ -1691,36 +1738,252 @@ function App() {
             ))}
           </motion.ol>
 
-          <div className="flex shrink-0 flex-col gap-3">
-            {!isNativeApp && (
-              <a
-                href={APK_DOWNLOAD_URL}
-                className="flex h-12 items-center justify-between rounded-full bg-primary px-5 text-sm font-bold text-primary-foreground transition-[filter,transform] hover:brightness-105 active:scale-[0.98]"
+        </Sheet>
+
+        {/* Number picker: tap a number instead of typing one */}
+        <Sheet
+          open={isNumberPickerOpen}
+          onClose={() => setIsNumberPickerOpen(false)}
+          labelledBy="number-picker-title"
+          header={
+            <div className="flex h-11 items-center justify-between">
+              <h2
+                id="number-picker-title"
+                className="font-display text-[22px] font-extrabold tracking-[-0.02em]"
               >
-                <span className="flex items-center gap-2">
-                  <Download className="size-4" />
-                  download for android
-                </span>
-                <span className="text-xs font-semibold opacity-70">apk · v{APP_VERSION}</span>
-              </a>
-            )}
-            <a
-              href={githubRepoUrl}
-              target={externalLinkTarget}
-              rel="noreferrer"
-              className="flex h-12 items-center justify-between rounded-full bg-secondary px-5 text-sm font-bold transition-[filter,transform] hover:brightness-110 active:scale-[0.98]"
-            >
-              <span className="flex items-center gap-2">
-                <Github className="size-4" />
-                star on github
-              </span>
-              <ExternalLink className="size-3.5 text-muted-foreground" />
-            </a>
-            <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
-              <span>tjeneritz.se</span>
-              <span>v{APP_VERSION}</span>
+                {numberPicker.title}
+              </h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="-mr-2.5"
+                onClick={() => setIsNumberPickerOpen(false)}
+                aria-label="Close"
+              >
+                <X className="size-5 stroke-[2.2]" />
+              </Button>
             </div>
-          </div>
+          }
+        >
+          <motion.div
+            variants={{
+              initial: {},
+              animate: { transition: { staggerChildren: 0.008, delayChildren: 0.02 } },
+            }}
+            initial="initial"
+            animate="animate"
+            role="radiogroup"
+            aria-labelledby="number-picker-title"
+            className={cn(
+              "grid gap-2 pb-1",
+              numberPicker.suffix ? "grid-cols-4" : "grid-cols-6",
+            )}
+          >
+            {numberPicker.options.map((option) => {
+              const isSelected = option === numberPicker.value;
+              return (
+                <motion.button
+                  key={option}
+                  variants={TILE}
+                  whileTap={{ scale: 0.92 }}
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  onClick={() => {
+                    haptic.tap();
+                    numberPicker.apply(option);
+                    window.setTimeout(() => setIsNumberPickerOpen(false), 140);
+                  }}
+                  className={cn(
+                    "h-14 cursor-pointer rounded-2xl font-display text-xl font-extrabold tabular-nums transition-colors duration-150 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
+                    isSelected
+                      ? numberPickerKind === "imposters"
+                        ? "bg-pink text-pink-foreground"
+                        : "bg-primary text-primary-foreground"
+                      : "bg-secondary text-secondary-foreground",
+                  )}
+                >
+                  {option}
+                  {numberPicker.suffix}
+                </motion.button>
+              );
+            })}
+          </motion.div>
+        </Sheet>
+
+        {/* Settings */}
+        <Sheet
+          open={showSettings}
+          onClose={() => setShowSettings(false)}
+          labelledBy="settings-sheet-title"
+          className="gap-5"
+          header={
+            <div className="flex h-11 items-center justify-between">
+              <h2
+                id="settings-sheet-title"
+                className="font-display text-[22px] font-extrabold tracking-[-0.02em]"
+              >
+                settings
+              </h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="-mr-2.5"
+                onClick={() => setShowSettings(false)}
+                aria-label="Close"
+              >
+                <X className="size-5 stroke-[2.2]" />
+              </Button>
+            </div>
+          }
+        >
+          <motion.div
+            variants={STAGGER}
+            initial="initial"
+            animate="animate"
+            className="-mx-5 flex min-h-0 flex-col gap-5 overflow-y-auto px-5"
+          >
+            <motion.section variants={RISE} className="flex flex-col gap-2.5">
+              <span
+                id="theme-label"
+                className="px-1 text-[13px] font-semibold text-muted-foreground"
+              >
+                Theme
+              </span>
+              <div
+                role="radiogroup"
+                aria-labelledby="theme-label"
+                className="grid grid-cols-2 rounded-full bg-background p-1"
+              >
+                {(["dark", "light"] as const).map((option) => {
+                  const isSelected = theme === option;
+                  const ThemeIcon = option === "dark" ? Moon : Sun;
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      role="radio"
+                      aria-checked={isSelected}
+                      onClick={() => {
+                        haptic.tap();
+                        setTheme(option);
+                      }}
+                      className={cn(
+                        "relative flex h-[42px] cursor-pointer items-center justify-center gap-2 rounded-full text-[15px] transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
+                        isSelected
+                          ? "font-bold text-primary-foreground"
+                          : "font-semibold text-foreground",
+                      )}
+                    >
+                      {isSelected && (
+                        <motion.span
+                          layoutId="theme-pill"
+                          transition={SPRING}
+                          className="absolute inset-0 rounded-full bg-primary"
+                        />
+                      )}
+                      <ThemeIcon className="relative size-4" />
+                      <span className="relative">{option}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.section>
+
+            {isNativeApp && (
+              <motion.section
+                variants={RISE}
+                className="rounded-[20px] bg-secondary pr-3 pl-[18px]"
+              >
+                <SettingRow id="haptics" title="Vibration">
+                  <Switch
+                    id="haptics"
+                    checked={hapticsOn}
+                    onCheckedChange={setHapticsOn}
+                  />
+                </SettingRow>
+              </motion.section>
+            )}
+
+            <motion.section variants={RISE} className="flex flex-col gap-2.5">
+              <span className="px-1 text-[13px] font-semibold text-muted-foreground">
+                About
+              </span>
+              <div className="flex flex-col divide-y divide-border/70 rounded-[20px] bg-secondary px-[18px]">
+                <div className="flex min-h-[52px] items-center justify-between">
+                  <span className="text-[15px] font-medium">Version</span>
+                  <span className="font-display text-sm font-extrabold">
+                    v{APP_VERSION}
+                  </span>
+                </div>
+                {isNativeApp && updateVersion && (
+                  <a
+                    href={APK_DOWNLOAD_URL}
+                    className="flex min-h-[52px] items-center justify-between text-pink"
+                  >
+                    <span className="text-[15px] font-semibold">
+                      Update to v{updateVersion}
+                    </span>
+                    <Download className="size-4" />
+                  </a>
+                )}
+                <a
+                  href="https://tjeneritz.se"
+                  target={externalLinkTarget}
+                  rel="noreferrer"
+                  className="flex min-h-[52px] items-center justify-between"
+                >
+                  <span className="text-[15px] font-medium">Made by</span>
+                  <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    tjeneritz.se
+                    <ExternalLink className="size-3.5" />
+                  </span>
+                </a>
+                <a
+                  href={githubRepoUrl}
+                  target={externalLinkTarget}
+                  rel="noreferrer"
+                  className="flex min-h-[52px] items-center justify-between"
+                >
+                  <span className="text-[15px] font-medium">Source code</span>
+                  <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Github className="size-3.5" />
+                    GitHub
+                    <ExternalLink className="size-3.5" />
+                  </span>
+                </a>
+              </div>
+              {!isNativeApp && (
+                <a
+                  href={APK_DOWNLOAD_URL}
+                  className="flex h-12 items-center justify-between rounded-full bg-primary px-5 text-sm font-bold text-primary-foreground transition-[filter,scale] hover:brightness-105 active:scale-[0.98]"
+                >
+                  <span className="flex items-center gap-2">
+                    <Download className="size-4" />
+                    download for android
+                  </span>
+                  <span className="text-xs font-semibold opacity-70">
+                    apk · v{APP_VERSION}
+                  </span>
+                </a>
+              )}
+            </motion.section>
+
+            <motion.div variants={RISE} className="flex justify-center pb-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-[13px]"
+                onClick={() => {
+                  haptic.press();
+                  resetSettings();
+                }}
+              >
+                <RotateCcw className="size-3.5" />
+                Reset game settings
+              </Button>
+            </motion.div>
+          </motion.div>
         </Sheet>
       </div>
     </MotionConfig>

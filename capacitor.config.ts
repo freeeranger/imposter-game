@@ -7,6 +7,12 @@ const config: CapacitorConfig = {
   // Matches the dark theme so the app never flashes white while loading.
   backgroundColor: "#15111f",
   plugins: {
+    // Held until the app has rendered (see hideSplashScreen), then faded out.
+    SplashScreen: {
+      launchAutoHide: false,
+      backgroundColor: "#15111f",
+      showSpinner: false,
+    },
     SystemBars: {
       insetsHandling: "css",
       initialViewportFitValueHint: "cover",

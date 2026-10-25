@@ -2,6 +2,7 @@ import { Capacitor, SystemBars, SystemBarsStyle } from "@capacitor/core";
 import { App } from "@capacitor/app";
 import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
 import { KeepAwake } from "@capacitor-community/keep-awake";
+import { SplashScreen } from "@capacitor/splash-screen";
 
 // Native-only features. Every helper is a safe no-op in the browser.
 export const isNativeApp = Capacitor.isNativePlatform();
@@ -13,12 +14,30 @@ const runNative = (action: () => Promise<unknown>) => {
   });
 };
 
+let hapticsEnabled = true;
+
+export const setHapticsEnabled = (enabled: boolean) => {
+  hapticsEnabled = enabled;
+};
+
+const runHaptic = (action: () => Promise<unknown>) => {
+  if (hapticsEnabled) runNative(action);
+};
+
 export const haptic = {
-  tap: () => runNative(() => Haptics.impact({ style: ImpactStyle.Light })),
-  press: () => runNative(() => Haptics.impact({ style: ImpactStyle.Medium })),
-  thud: () => runNative(() => Haptics.impact({ style: ImpactStyle.Heavy })),
+  tap: () => runHaptic(() => Haptics.impact({ style: ImpactStyle.Light })),
+  press: () => runHaptic(() => Haptics.impact({ style: ImpactStyle.Medium })),
+  thud: () => runHaptic(() => Haptics.impact({ style: ImpactStyle.Heavy })),
   success: () =>
-    runNative(() => Haptics.notification({ type: NotificationType.Success })),
+    runHaptic(() => Haptics.notification({ type: NotificationType.Success })),
+};
+
+// Once fonts are in, swap the native splash for the app with a short fade.
+export const hideSplashScreen = () => {
+  if (!isNativeApp) return;
+  void document.fonts.ready.then(() =>
+    SplashScreen.hide({ fadeOutDuration: 250 }).catch(() => {}),
+  );
 };
 
 export const setKeepAwake = (keepAwake: boolean) =>
