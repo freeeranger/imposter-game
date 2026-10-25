@@ -20,10 +20,6 @@ bunx cap sync android
 ./gradlew assembleDebug
 ```
 
-### Releasing
-- **Website:** deploys automatically from `main`. Every push to `main` goes live.
-- **Android:** bump `version` in `package.json`, commit, then push a matching tag (e.g. `v1.2.1`). The tag runs the Android release workflow, which builds a signed APK and publishes it as a GitHub release; installed apps pick it up through the in-app updater.
-
 ## License
 The game is available under the GPL-3.0 license.
 
