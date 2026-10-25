@@ -2908,11 +2908,6 @@ function App() {
                   <SettingRow
                     id="hide-builtin"
                     title="Hide built-in categories"
-                    description={
-                      interfacePrefs.hideCustomCategories
-                        ? "Show your categories to hide these"
-                        : undefined
-                    }
                   >
                     <Switch
                       id="hide-builtin"
@@ -2923,15 +2918,7 @@ function App() {
                       }
                     />
                   </SettingRow>
-                  <SettingRow
-                    id="hide-custom"
-                    title="Hide your categories"
-                    description={
-                      interfacePrefs.hideBuiltinCategories
-                        ? "Show built-in categories to hide these"
-                        : undefined
-                    }
-                  >
+                  <SettingRow id="hide-custom" title="Hide your categories">
                     <Switch
                       id="hide-custom"
                       checked={interfacePrefs.hideCustomCategories}
