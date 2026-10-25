@@ -1,13 +1,24 @@
 # Imposter game
 
-A "lite schysstare" website for playing imposter game. Supports multiple imposters, prank editions, different categories and more :).
+A "lite schysstare" game for playing the imposter game. Supports multiple imposters, prank editions, different categories and more :).
 
-Hosted on https://tjeneritz.se
+The app is available both as a website (https://tjeneritz.se) and as android app ([download here](https://github.com/freeeranger/imposter-game/releases/latest/download/imposter.apk)).
 
-## Android app
+## Technical stuff
+The game is built in react, and the android app uses capacitor.
 
-The same game ships as an Android app (Capacitor) with haptics, keep-awake during rounds and back-button support.
+### Web dev
+```zsh
+bun i
+bun run dev
+```
 
-- Download: https://github.com/freeeranger/imposter-game/releases/latest/download/imposter.apk
-- Release: bump `version` in `package.json`, commit, then push a matching tag (`git tag v1.2.0 && git push origin v1.2.0`). GitHub Actions builds a signed APK and publishes it as a release.
-- Local build: `bun run build && bunx cap sync android`, then open `android/` in Android Studio or run `./gradlew assembleDebug` in it.
+### App dev
+```zsh
+bun run build
+bunx cap sync android
+./gradlew assembleDebug
+```
+
+## License
+The game is available under the GPL-v3.0 license.
