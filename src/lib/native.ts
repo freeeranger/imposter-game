@@ -154,15 +154,17 @@ export const setBackInterception = (enabled: boolean) =>
 
 // Returns an unsubscribe function, so it slots straight into a useEffect.
 export const onPredictiveBack = (handlers: {
+  onStart: () => void;
   onProgress: (progress: number, edge: "left" | "right") => void;
   onCancel: () => void;
   onInvoke: () => void;
 }) => {
   if (!isNativeApp) return () => {};
   const listeners = [
-    PredictiveBack.addListener("backStarted", (event) =>
-      handlers.onProgress(event.progress, event.edge),
-    ),
+    PredictiveBack.addListener("backStarted", (event) => {
+      handlers.onStart();
+      handlers.onProgress(event.progress, event.edge);
+    }),
     PredictiveBack.addListener("backProgressed", (event) =>
       handlers.onProgress(event.progress, event.edge),
     ),

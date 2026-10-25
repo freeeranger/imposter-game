@@ -1095,25 +1095,49 @@ function App() {
   }));
   const [backTarget, setBackTarget] = useState<BackLayer | null>(null);
 
+  // A new swipe can start while the last one is still settling (the closed layer animating
+  // out, or a cancelled preview springing back). It takes over: the pending reset and spring
+  // are dropped and the preview moves to whatever layer is on top now.
+  const backGesture = useRef<{
+    generation: number;
+    resetTimer?: number;
+    spring?: { stop: () => void };
+  }>({ generation: 0 });
+
   useEffect(
     () =>
       onPredictiveBack({
+        onStart: () => {
+          const gesture = backGesture.current;
+          gesture.generation += 1;
+          window.clearTimeout(gesture.resetTimer);
+          gesture.spring?.stop();
+          setBackTarget(topLayerRef.current);
+        },
         onProgress: (progress, edge) => {
-          setBackTarget((current) => current ?? topLayerRef.current);
           backEdge.set(edge === "left" ? 1 : -1);
           backProgress.set(progress);
         },
         onCancel: () => {
-          void animate(backProgress, 0, {
+          const gesture = backGesture.current;
+          const generation = gesture.generation;
+          const spring = animate(backProgress, 0, {
             type: "spring",
             stiffness: 500,
             damping: 40,
-          }).then(() => setBackTarget(null));
+          });
+          gesture.spring = spring;
+          void spring.then(() => {
+            if (gesture.generation === generation) setBackTarget(null);
+          });
         },
         onInvoke: () => {
+          const gesture = backGesture.current;
+          const generation = gesture.generation;
           handleBackRef.current();
           // Let the closing layer finish its exit before the preview resets.
-          window.setTimeout(() => {
+          gesture.resetTimer = window.setTimeout(() => {
+            if (gesture.generation !== generation) return;
             backProgress.set(0);
             setBackTarget(null);
           }, 320);
