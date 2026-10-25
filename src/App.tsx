@@ -147,7 +147,13 @@ const CategoryHint = ({ hint }: { hint?: string }) =>
     </div>
   ) : null;
 
-const RoundProgress = ({ current, total }: { current: number; total: number }) => (
+const RoundProgress = ({
+  current,
+  total,
+}: {
+  current: number;
+  total: number;
+}) => (
   <div className="flex gap-1.5" aria-hidden="true">
     {Array.from({ length: total }, (_, index) => (
       <span
@@ -179,7 +185,12 @@ const RoundHeader = ({
 }) => (
   <div className="flex flex-col gap-3.5">
     <div className="flex h-11 items-center justify-between">
-      <Button variant="secondary" size="icon" onClick={onEnd} aria-label="End game">
+      <Button
+        variant="secondary"
+        size="icon"
+        onClick={onEnd}
+        aria-label="End game"
+      >
         <X className="size-[18px] stroke-[2.2]" />
       </Button>
       <span className="flex items-baseline gap-1 text-[15px] font-bold">
@@ -249,7 +260,10 @@ const SettingRow = ({
   children: ReactNode;
 }) => (
   <div className="flex min-h-[60px] items-center justify-between gap-3 py-2.5">
-    <label htmlFor={id} className="flex min-w-0 cursor-pointer flex-col gap-0.5">
+    <label
+      htmlFor={id}
+      className="flex min-w-0 cursor-pointer flex-col gap-0.5"
+    >
       <span className="text-[15px] font-semibold">{title}</span>
       {description && (
         <span className="text-[13px] text-muted-foreground">{description}</span>
@@ -265,7 +279,10 @@ const wordSizeClass = (word: string) => {
   return "text-[42px]";
 };
 
-const getCategoryWords = (category: Category, difficulty: Difficulty): string[] => {
+const getCategoryWords = (
+  category: Category,
+  difficulty: Difficulty,
+): string[] => {
   if (difficulty === "easy") return category.easy;
   if (difficulty === "hard") return category.hard;
   return [...category.easy, ...category.hard];
@@ -299,7 +316,13 @@ type NumberPickerKind = "players" | "imposters" | "prank";
 const PRANK_PRESETS = [0, 5, 10, 15, 20, 25];
 
 // Layers that close on Android back, top-most first.
-type BackLayer = "confirm" | "picker" | "license" | "settings" | "category" | "info";
+type BackLayer =
+  | "confirm"
+  | "picker"
+  | "license"
+  | "settings"
+  | "category"
+  | "info";
 
 type UpdateStatus =
   | "idle"
@@ -313,14 +336,23 @@ type UpdateStatus =
 // The GPL text is hard-wrapped at ~72 columns; rejoin each paragraph so it flows on a phone.
 const LICENSE_PARAGRAPHS = licenseText
   .split(/\n\s*\n/)
-  .map((paragraph) => paragraph.split("\n").map((line) => line.trim()).join(" ").trim())
+  .map((paragraph) =>
+    paragraph
+      .split("\n")
+      .map((line) => line.trim())
+      .join(" ")
+      .trim(),
+  )
   .filter(Boolean);
 
 const AUTHOR_NAME = "Lukas Viering";
 const AUTHOR_URL = "https://freeranger.dev";
 const WEBSITE_URL = "https://tjeneritz.se";
 const range = (from: number, to: number) =>
-  Array.from({ length: Math.max(0, to - from + 1) }, (_, index) => from + index);
+  Array.from(
+    { length: Math.max(0, to - from + 1) },
+    (_, index) => from + index,
+  );
 const SETTINGS_STORAGE_KEY = "imposter-game-settings";
 
 type PersistedSettings = {
@@ -485,7 +517,11 @@ const DROP_CARD: Variants = {
 // Kept to a cheap, short tween: 17 tiles springing at once made the sheet feel sluggish.
 const TILE: Variants = {
   initial: { opacity: 0, y: 6 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.16, ease: "easeOut" } },
+  animate: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.16, ease: "easeOut" },
+  },
 };
 
 const pickRandom = <T,>(items: T[]): T =>
@@ -511,16 +547,22 @@ const getUniqueCategoryWords = (
 ): string[] => Array.from(new Set(getCategoryWords(category, difficulty)));
 
 function App() {
-  const [themePreference, setThemePreference] = useState<ThemePreference>(() => {
-    if (typeof window === "undefined") return "dark";
+  const [themePreference, setThemePreference] = useState<ThemePreference>(
+    () => {
+      if (typeof window === "undefined") return "dark";
 
-    const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-    if (savedTheme === "light" || savedTheme === "dark" || savedTheme === "system") {
-      return savedTheme;
-    }
+      const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+      if (
+        savedTheme === "light" ||
+        savedTheme === "dark" ||
+        savedTheme === "system"
+      ) {
+        return savedTheme;
+      }
 
-    return "dark";
-  });
+      return "dark";
+    },
+  );
   const [systemPrefersDark, setSystemPrefersDark] = useState<boolean>(
     () => window.matchMedia(SYSTEM_DARK_QUERY).matches,
   );
@@ -568,9 +610,9 @@ function App() {
     settings.randomPool,
   );
 
-  const [playerAssignments, setPlayerAssignments] = useState<PlayerAssignment[]>(
-    [],
-  );
+  const [playerAssignments, setPlayerAssignments] = useState<
+    PlayerAssignment[]
+  >([]);
   const [activeCategory, setActiveCategory] = useState<string>(
     DEFAULT_CATEGORY === "random" ? "" : DEFAULT_CATEGORY,
   );
@@ -582,7 +624,9 @@ function App() {
   const [updateVersion, setUpdateVersion] = useState<string | null>(null);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
   const [downloadProgress, setDownloadProgress] = useState<number>(0);
-  const [downloadedUpdateUri, setDownloadedUpdateUri] = useState<string | null>(null);
+  const [downloadedUpdateUri, setDownloadedUpdateUri] = useState<string | null>(
+    null,
+  );
   const [autoUpdate, setAutoUpdate] = useState<boolean>(() => {
     try {
       return window.localStorage.getItem(AUTO_UPDATE_STORAGE_KEY) !== "off";
@@ -592,15 +636,15 @@ function App() {
   });
   const [showLicense, setShowLicense] = useState<boolean>(false);
   // The update banner can be dismissed per version; a newer release brings it back.
-  const [dismissedUpdateVersion, setDismissedUpdateVersion] = useState<string | null>(
-    () => {
-      try {
-        return window.localStorage.getItem(DISMISSED_UPDATE_STORAGE_KEY);
-      } catch {
-        return null;
-      }
-    },
-  );
+  const [dismissedUpdateVersion, setDismissedUpdateVersion] = useState<
+    string | null
+  >(() => {
+    try {
+      return window.localStorage.getItem(DISMISSED_UPDATE_STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  });
   const [showEndConfirm, setShowEndConfirm] = useState<boolean>(false);
   const [showInstallHelp, setShowInstallHelp] = useState<boolean>(false);
   const autoDownloadStarted = useRef(false);
@@ -627,7 +671,10 @@ function App() {
   useEffect(() => {
     setHapticsEnabled(hapticsOn);
     try {
-      window.localStorage.setItem(HAPTICS_STORAGE_KEY, hapticsOn ? "on" : "off");
+      window.localStorage.setItem(
+        HAPTICS_STORAGE_KEY,
+        hapticsOn ? "on" : "off",
+      );
     } catch {
       // ignore storage write errors (e.g. private mode)
     }
@@ -674,7 +721,10 @@ function App() {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(AUTO_UPDATE_STORAGE_KEY, autoUpdate ? "on" : "off");
+      window.localStorage.setItem(
+        AUTO_UPDATE_STORAGE_KEY,
+        autoUpdate ? "on" : "off",
+      );
     } catch {
       // ignore storage write errors (e.g. private mode)
     }
@@ -902,10 +952,7 @@ function App() {
       prankProbability > 0 && Math.random() < prankProbability / 100;
 
     if (shouldUsePrank) {
-      const availablePranks: PrankMode[] = [
-        "everyone-imposter",
-        "no-imposter",
-      ];
+      const availablePranks: PrankMode[] = ["everyone-imposter", "no-imposter"];
 
       if (categoryWords.length >= playersCount) {
         availablePranks.push("different-words");
@@ -949,10 +996,9 @@ function App() {
       }
     } else {
       const imposterIndices = new Set(
-        shuffle(Array.from({ length: playersCount }, (_, index) => index)).slice(
-          0,
-          impostersCount,
-        ),
+        shuffle(
+          Array.from({ length: playersCount }, (_, index) => index),
+        ).slice(0, impostersCount),
       );
       const sharedWord = pickRandom(categoryWords);
 
@@ -1064,7 +1110,9 @@ function App() {
     } catch {
       // Fall back to the browser download if the in-app install fails.
       window.location.href = APK_DOWNLOAD_URL;
-      setUpdateStatus((status) => (status === "downloading" ? "available" : status));
+      setUpdateStatus((status) =>
+        status === "downloading" ? "available" : status,
+      );
     }
   };
 
@@ -1073,7 +1121,10 @@ function App() {
     setDismissedUpdateVersion(updateVersion);
     try {
       if (updateVersion) {
-        window.localStorage.setItem(DISMISSED_UPDATE_STORAGE_KEY, updateVersion);
+        window.localStorage.setItem(
+          DISMISSED_UPDATE_STORAGE_KEY,
+          updateVersion,
+        );
       }
     } catch {
       // ignore storage write errors (e.g. private mode)
@@ -1215,1433 +1266,1529 @@ function App() {
 
   return (
     <PredictiveBackContext.Provider value={predictiveBackValues}>
-    <MotionConfig reducedMotion="user">
-      <div className="relative flex h-dvh w-full justify-center overflow-hidden bg-background text-foreground transition-colors select-none">
-        <div className="flex h-full w-full max-w-md flex-col px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] pl-[max(1.25rem,env(safe-area-inset-left))] pr-[max(1.25rem,env(safe-area-inset-right))]">
-          {/* Top bar: stays put while the content below changes */}
-          <div className="shrink-0">
-            <AnimatePresence mode="wait">
-              {hasLaunched && gameState === "setup" && (
-                <motion.header
-                  key="setup-bar"
-                  initial={{ opacity: 0, y: -8 }}
-                  animate={{ opacity: 1, y: 0, transition: SOFT_SPRING }}
-                  exit={FADE_OUT}
-                  className="flex h-11 items-center justify-between"
-                >
-                  <h1 className="font-display text-[28px] font-extrabold leading-none tracking-[-0.03em]">
-                    imposter
-                  </h1>
-                  <div className="-mr-2.5 flex">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setShowInfoModal(true)}
-                      aria-label="How to play"
-                    >
-                      <Info className="size-5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setShowSettings(true)}
-                      aria-label="Settings"
-                      className="[&_svg]:transition-transform [&_svg]:duration-300 hover:[&_svg]:rotate-45"
-                    >
-                      <Settings className="size-5" />
-                    </Button>
-                  </div>
-                </motion.header>
-              )}
-              {isInRound && (
-                <motion.div
-                  key="round-bar"
-                  initial={{ opacity: 0, y: -8 }}
-                  animate={{ opacity: 1, y: 0, transition: SOFT_SPRING }}
-                  exit={FADE_OUT}
-                >
-                  <RoundHeader
-                    current={currentPlayer}
-                    total={playersCount}
-                    onEnd={endGame}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          <main className="relative flex min-h-0 flex-1 flex-col [perspective:1200px]">
-            <AnimatePresence mode="wait" custom={swipeDirection}>
-              {hasLaunched && gameState === "setup" && (
-                <motion.div
-                  key="setup"
-                  variants={STAGGER}
-                  initial="initial"
-                  animate="animate"
-                  exit={FADE_OUT}
-                  className="-mx-5 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain px-5 pt-5 pb-2"
-                >
-                  {/* Auto-update on: just a quiet status chip while it downloads / waits to install. */}
-                  <AnimatePresence initial={false}>
-                    {showUpdateChip && (
-                      <motion.button
-                        key="update-chip"
-                        type="button"
-                        initial={{ opacity: 0, y: -8, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -8, scale: 0.95 }}
-                        transition={SPRING}
-                        onClick={updateStatus === "ready" ? installUpdate : undefined}
-                        disabled={updateStatus !== "ready"}
-                        className="flex h-9 shrink-0 cursor-pointer items-center gap-2 self-center rounded-full bg-card px-4 text-[13px] font-semibold tabular-nums disabled:cursor-default"
-                      >
-                        {updateStatus === "ready" ? (
-                          <>
-                            <Download className="size-3.5 text-pink" />
-                            v{updateVersion} ready · install
-                          </>
-                        ) : (
-                          <>
-                            <Loader2 className="size-3.5 animate-spin text-pink" />
-                            updating to v{updateVersion} · {Math.round(downloadProgress * 100)}%
-                          </>
-                        )}
-                      </motion.button>
-                    )}
-                  </AnimatePresence>
-
-                  {/* Auto-update off: a banner you can install from or dismiss for this version. */}
-                  <AnimatePresence initial={false}>
-                    {showUpdateBanner && (
-                      <motion.div
-                        key="update-banner"
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={SPRING}
-                        className="shrink-0 overflow-hidden"
-                      >
-                        <div className="flex items-center gap-1 rounded-[20px] bg-pink py-2 pr-1.5 pl-[18px] text-pink-foreground">
-                          <span className="flex min-w-0 flex-1 flex-col">
-                            <span className="text-[15px] font-bold">update available</span>
-                            <span className="text-[13px] font-medium opacity-80">
-                              v{updateVersion} is out
-                            </span>
-                          </span>
-                          <motion.button
-                            type="button"
-                            onClick={installUpdate}
-                            whileTap={{ scale: 0.95 }}
-                            className="flex h-11 cursor-pointer items-center gap-1.5 rounded-full bg-pink-foreground px-4 text-sm font-bold text-pink tabular-nums"
-                          >
-                            {updateStatus === "downloading" ? (
-                              <>
-                                <Loader2 className="size-4 animate-spin" />
-                                {Math.round(downloadProgress * 100)}%
-                              </>
-                            ) : (
-                              <>
-                                <Download className="size-4" />
-                                install
-                              </>
-                            )}
-                          </motion.button>
-                          <button
-                            type="button"
-                            onClick={dismissUpdate}
-                            aria-label="Dismiss update"
-                            className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full transition-[background-color] hover:bg-pink-foreground/10"
-                          >
-                            <X className="size-5 stroke-[2.4]" />
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                  <motion.div
-                    variants={RISE}
-                    className="grid shrink-0 grid-cols-2 rounded-[24px] bg-card pt-4 pb-[18px]"
+      <MotionConfig reducedMotion="user">
+        <div className="relative flex h-dvh w-full justify-center overflow-hidden bg-background text-foreground transition-colors select-none">
+          <div className="flex h-full w-full max-w-md flex-col px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] pl-[max(1.25rem,env(safe-area-inset-left))] pr-[max(1.25rem,env(safe-area-inset-right))]">
+            {/* Top bar: stays put while the content below changes */}
+            <div className="shrink-0">
+              <AnimatePresence mode="wait">
+                {hasLaunched && gameState === "setup" && (
+                  <motion.header
+                    key="setup-bar"
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0, transition: SOFT_SPRING }}
+                    exit={FADE_OUT}
+                    className="flex h-11 items-center justify-between"
                   >
-                    <div className="flex flex-col items-center gap-2 border-r border-border/70 px-3.5">
-                      <label
-                        htmlFor="players"
-                        className="text-[13px] font-semibold text-muted-foreground"
+                    <h1 className="font-display text-[28px] font-extrabold leading-none tracking-[-0.03em]">
+                      imposter
+                    </h1>
+                    <div className="-mr-2.5 flex">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setShowInfoModal(true)}
+                        aria-label="How to play"
                       >
-                        Players
-                      </label>
-                      <NumberStepper
-                        id="players"
-                        label="players"
-                        min={3}
-                        max={20}
-                        value={playersCount}
-                        onChange={applyPlayersCount}
-                        onPick={() => openNumberPicker("players")}
-                      />
-                    </div>
-                    <div className="flex flex-col items-center gap-2 px-3.5">
-                      <label
-                        htmlFor="imposters"
-                        className="text-[13px] font-semibold text-muted-foreground"
+                        <Info className="size-5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setShowSettings(true)}
+                        aria-label="Settings"
+                        className="[&_svg]:transition-transform [&_svg]:duration-300 hover:[&_svg]:rotate-45"
                       >
-                        Imposters
-                      </label>
-                      <NumberStepper
-                        id="imposters"
-                        label="imposters"
-                        min={1}
-                        max={Math.max(1, playersCount - 1)}
-                        value={impostersCount}
-                        onChange={setImpostersCount}
-                        onPick={() => openNumberPicker("imposters")}
-                        valueClassName="text-pink"
-                      />
+                        <Settings className="size-5" />
+                      </Button>
                     </div>
-                  </motion.div>
-
-                  <motion.div variants={RISE} className="shrink-0 py-1 pr-1.5">
-                    <motion.button
-                      type="button"
-                      onClick={() => setShowCategorySheet(true)}
-                      aria-haspopup="dialog"
-                      whileTap={{ scale: 0.98 }}
-                      className="relative flex min-h-[88px] w-full -rotate-1 cursor-pointer items-center justify-between gap-3 rounded-[24px] border-[1.5px] border-border bg-card py-3.5 pr-4 pl-5 text-left shadow-[6px_6px_0_var(--pink)] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60"
-                    >
-                      <AnimatePresence initial={false}>
-                        {selectedCategoryInfo?.tag && (
-                          <motion.span
-                            key={selectedCategory}
-                            initial={{ opacity: 0, scale: 0.5 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.5 }}
-                            transition={SPRING}
-                            className="absolute -top-[11px] right-[26px]"
-                          >
-                            <CategorySticker
-                              tag={selectedCategoryInfo.tag}
-                              className="px-2.5 py-[3px] text-xs"
-                            />
-                          </motion.span>
-                        )}
-                      </AnimatePresence>
-                      <span className="relative flex min-w-0 flex-1 flex-col">
-                        <AnimatePresence mode="popLayout" initial={false}>
-                          <motion.span
-                            key={selectedCategory}
-                            initial={{ opacity: 0, y: 14 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -14 }}
-                            transition={SPRING}
-                            className="flex min-w-0 flex-col gap-[5px]"
-                          >
-                            <span className="text-[13px] font-semibold text-muted-foreground">
-                              Category
-                            </span>
-                            <span className="flex min-w-0 items-center gap-2">
-                              {isRandomMix && (
-                                <Shuffle className="size-5 shrink-0 text-pink" />
-                              )}
-                              <span className="truncate font-display text-[26px] leading-none font-extrabold lowercase tracking-[-0.03em] text-highlight">
-                                {isRandomMix
-                                  ? "random mix"
-                                  : (selectedCategoryInfo?.label ?? "pick one")}
-                              </span>
-                            </span>
-                            <span className="flex items-baseline gap-1 text-[13px] text-muted-foreground">
-                              {isRandomMix ? (
-                                <>
-                                  picks from <RollingNumber value={randomPoolCount} /> of{" "}
-                                  {CATEGORY_KEYS.length}
-                                </>
-                              ) : (
-                                <>
-                                  <RollingNumber value={selectedWordCount} /> words
-                                </>
-                              )}
-                            </span>
-                          </motion.span>
-                        </AnimatePresence>
-                      </span>
-                      <ChevronRight className="size-5 shrink-0 stroke-[2.2] text-muted-foreground" />
-                    </motion.button>
-                  </motion.div>
-
-                  <motion.div variants={RISE} className="flex shrink-0 flex-col gap-2.5">
-                    <div className="flex items-baseline justify-between gap-3 px-1">
-                      <span
-                        id="difficulty-label"
-                        className="text-[13px] font-semibold text-muted-foreground"
-                      >
-                        Difficulty
-                      </span>
-                      <span className="relative h-5 min-w-0 flex-1 overflow-hidden text-right">
-                        <AnimatePresence mode="popLayout" initial={false}>
-                          <motion.span
-                            key={selectedDifficulty}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            transition={SPRING}
-                            className="block truncate text-[13px] text-muted-foreground/80"
-                          >
-                            {DIFFICULTY_DESCRIPTIONS[selectedDifficulty]}
-                          </motion.span>
-                        </AnimatePresence>
-                      </span>
-                    </div>
-                    <div
-                      role="radiogroup"
-                      aria-labelledby="difficulty-label"
-                      className="grid grid-cols-3 rounded-full bg-card p-1"
-                    >
-                      {DIFFICULTIES.map((difficulty) => {
-                        const isSelected = difficulty === selectedDifficulty;
-                        return (
-                          <button
-                            key={difficulty}
-                            type="button"
-                            role="radio"
-                            aria-checked={isSelected}
-                            onClick={() => {
-                              haptic.tap();
-                              setSelectedDifficulty(difficulty);
-                            }}
-                            className={cn(
-                              "relative h-[42px] cursor-pointer rounded-full text-[15px] transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
-                              isSelected
-                                ? "font-bold text-primary-foreground"
-                                : "font-semibold text-foreground",
-                            )}
-                          >
-                            {isSelected && (
-                              <motion.span
-                                layoutId="difficulty-pill"
-                                transition={SPRING}
-                                className="absolute inset-0 rounded-full bg-primary"
-                              />
-                            )}
-                            <span className="relative">
-                              {DIFFICULTY_LABELS[difficulty]}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </motion.div>
-
+                  </motion.header>
+                )}
+                {isInRound && (
                   <motion.div
-                    variants={RISE}
-                    className="flex shrink-0 flex-col divide-y divide-border/70 rounded-[24px] bg-card pr-3 pl-[18px]"
+                    key="round-bar"
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0, transition: SOFT_SPRING }}
+                    exit={FADE_OUT}
                   >
-                    <SettingRow id="randomize-starter" title="Random first speaker">
-                      <Switch
-                        id="randomize-starter"
-                        checked={randomizeStarter}
-                        onCheckedChange={setRandomizeStarter}
-                      />
-                    </SettingRow>
+                    <RoundHeader
+                      current={currentPlayer}
+                      total={playersCount}
+                      onEnd={endGame}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            <main className="relative flex min-h-0 flex-1 flex-col [perspective:1200px]">
+              <AnimatePresence mode="wait" custom={swipeDirection}>
+                {hasLaunched && gameState === "setup" && (
+                  <motion.div
+                    key="setup"
+                    variants={STAGGER}
+                    initial="initial"
+                    animate="animate"
+                    exit={FADE_OUT}
+                    className="-mx-5 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain px-5 pt-5 pb-2"
+                  >
+                    {/* Auto-update on: just a quiet status chip while it downloads / waits to install. */}
                     <AnimatePresence initial={false}>
-                      {canRevealFellows && (
+                      {showUpdateChip && (
+                        <motion.button
+                          key="update-chip"
+                          type="button"
+                          initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                          transition={SPRING}
+                          onClick={
+                            updateStatus === "ready" ? installUpdate : undefined
+                          }
+                          disabled={updateStatus !== "ready"}
+                          className="flex h-9 shrink-0 cursor-pointer items-center gap-2 self-center rounded-full bg-card px-4 text-[13px] font-semibold tabular-nums disabled:cursor-default"
+                        >
+                          {updateStatus === "ready" ? (
+                            <>
+                              <Download className="size-3.5 text-pink" />v
+                              {updateVersion} ready · install
+                            </>
+                          ) : (
+                            <>
+                              <Loader2 className="size-3.5 animate-spin text-pink" />
+                              updating to v{updateVersion} ·{" "}
+                              {Math.round(downloadProgress * 100)}%
+                            </>
+                          )}
+                        </motion.button>
+                      )}
+                    </AnimatePresence>
+
+                    {/* Auto-update off: a banner you can install from or dismiss for this version. */}
+                    <AnimatePresence initial={false}>
+                      {showUpdateBanner && (
                         <motion.div
+                          key="update-banner"
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: "auto" }}
                           exit={{ opacity: 0, height: 0 }}
                           transition={SPRING}
-                          className="overflow-hidden"
+                          className="shrink-0 overflow-hidden"
                         >
-                          <SettingRow
-                            id="fellow-imposters"
-                            title="Imposters know each other"
-                          >
-                            <Switch
-                              id="fellow-imposters"
-                              checked={revealFellowImposters}
-                              onCheckedChange={setRevealFellowImposters}
-                            />
-                          </SettingRow>
+                          <div className="flex items-center gap-1 rounded-[20px] bg-pink py-2 pr-1.5 pl-[18px] text-pink-foreground">
+                            <span className="flex min-w-0 flex-1 flex-col">
+                              <span className="text-[15px] font-bold">
+                                update available
+                              </span>
+                              <span className="text-[13px] font-medium opacity-80">
+                                v{updateVersion} is out
+                              </span>
+                            </span>
+                            <motion.button
+                              type="button"
+                              onClick={installUpdate}
+                              whileTap={{ scale: 0.95 }}
+                              className="flex h-11 cursor-pointer items-center gap-1.5 rounded-full bg-pink-foreground px-4 text-sm font-bold text-pink tabular-nums"
+                            >
+                              {updateStatus === "downloading" ? (
+                                <>
+                                  <Loader2 className="size-4 animate-spin" />
+                                  {Math.round(downloadProgress * 100)}%
+                                </>
+                              ) : (
+                                <>
+                                  <Download className="size-4" />
+                                  install
+                                </>
+                              )}
+                            </motion.button>
+                            <button
+                              type="button"
+                              onClick={dismissUpdate}
+                              aria-label="Dismiss update"
+                              className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full transition-[background-color] hover:bg-pink-foreground/10"
+                            >
+                              <X className="size-5 stroke-[2.4]" />
+                            </button>
+                          </div>
                         </motion.div>
                       )}
                     </AnimatePresence>
-                    <SettingRow id="prank-probability" title="Prank rounds">
-                      <NumberStepper
-                        id="prank-probability"
-                        label="prank chance"
-                        size="sm"
-                        min={0}
-                        max={100}
-                        value={prankProbability}
-                        onChange={setPrankProbability}
-                        onPick={() => openNumberPicker("prank")}
-                        suffix="%"
-                      />
-                    </SettingRow>
-                  </motion.div>
-                </motion.div>
-              )}
-
-              {gameState === "pass" && (
-                <motion.div
-                  key={panelKey}
-                  variants={PASS_VARIANTS}
-                  initial="initial"
-                  animate="animate"
-                  exit="exit"
-                  className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 text-center"
-                >
-                  <motion.span
-                    variants={RISE}
-                    className="text-base font-semibold text-muted-foreground"
-                  >
-                    pass the phone to
-                  </motion.span>
-                  <motion.p
-                    variants={PLAYER_POP}
-                    className="font-display text-6xl font-extrabold tracking-[-0.03em] text-highlight"
-                  >
-                    player {currentPlayer}
-                  </motion.p>
-                  <motion.p
-                    variants={RISE}
-                    className="max-w-[16rem] text-sm text-muted-foreground"
-                  >
-                    make sure nobody else is peeking.
-                  </motion.p>
-                </motion.div>
-              )}
-
-              {gameState === "reveal" && (
-                <motion.div
-                  key={panelKey}
-                  variants={STAGGER}
-                  initial="initial"
-                  animate="animate"
-                  exit="exit"
-                  className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 py-5"
-                >
-                  <motion.div
-                    variants={CARD_VARIANTS}
-                    className="h-[min(420px,52dvh)] w-full max-w-[310px]"
-                  >
-                    <SwipeCard onSwipe={passWithSwipe}>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold text-muted-foreground">
-                          {currentAssignment?.isImposter ? "your role" : "your word"}
-                        </span>
-                        <VenetianMask className="size-6 text-pink" aria-hidden />
-                      </div>
-                      {currentAssignment?.isImposter ? (
-                        <div className="flex flex-col items-center gap-2 text-center">
-                          <span className="text-base font-semibold">you are the</span>
-                          <p className="font-display text-[40px] font-extrabold leading-[1.05] tracking-[-0.03em] text-pink">
-                            imposter
-                          </p>
-                        </div>
-                      ) : (
-                        <p
-                          className={cn(
-                            "text-center font-display font-extrabold leading-[1.05] tracking-[-0.03em] break-words text-highlight",
-                            wordSizeClass(currentAssignment?.word ?? ""),
-                          )}
+                    <motion.div
+                      variants={RISE}
+                      className="grid shrink-0 grid-cols-2 rounded-[24px] bg-card pt-4 pb-[18px]"
+                    >
+                      <div className="flex flex-col items-center gap-2 border-r border-border/70 px-3.5">
+                        <label
+                          htmlFor="players"
+                          className="text-[13px] font-semibold text-muted-foreground"
                         >
-                          {currentAssignment?.word ?? "no word"}
-                        </p>
-                      )}
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="truncate rounded-full bg-secondary px-3.5 py-2 text-sm font-bold lowercase">
-                          {activeCategoryInfo?.label}
+                          Players
+                        </label>
+                        <NumberStepper
+                          id="players"
+                          label="players"
+                          min={3}
+                          max={20}
+                          value={playersCount}
+                          onChange={applyPlayersCount}
+                          onPick={() => openNumberPicker("players")}
+                        />
+                      </div>
+                      <div className="flex flex-col items-center gap-2 px-3.5">
+                        <label
+                          htmlFor="imposters"
+                          className="text-[13px] font-semibold text-muted-foreground"
+                        >
+                          Imposters
+                        </label>
+                        <NumberStepper
+                          id="imposters"
+                          label="imposters"
+                          min={1}
+                          max={Math.max(1, playersCount - 1)}
+                          value={impostersCount}
+                          onChange={setImpostersCount}
+                          onPick={() => openNumberPicker("imposters")}
+                          valueClassName="text-pink"
+                        />
+                      </div>
+                    </motion.div>
+
+                    <motion.div
+                      variants={RISE}
+                      className="shrink-0 py-1 pr-1.5"
+                    >
+                      <motion.button
+                        type="button"
+                        onClick={() => setShowCategorySheet(true)}
+                        aria-haspopup="dialog"
+                        whileTap={{ scale: 0.98 }}
+                        className="relative flex min-h-[88px] w-full -rotate-1 cursor-pointer items-center justify-between gap-3 rounded-[24px] border-[1.5px] border-border bg-card py-3.5 pr-4 pl-5 text-left shadow-[6px_6px_0_var(--pink)] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60"
+                      >
+                        <AnimatePresence initial={false}>
+                          {selectedCategoryInfo?.tag && (
+                            <motion.span
+                              key={selectedCategory}
+                              initial={{ opacity: 0, scale: 0.5 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.5 }}
+                              transition={SPRING}
+                              className="absolute -top-[11px] right-[26px]"
+                            >
+                              <CategorySticker
+                                tag={selectedCategoryInfo.tag}
+                                className="px-2.5 py-[3px] text-xs"
+                              />
+                            </motion.span>
+                          )}
+                        </AnimatePresence>
+                        <span className="relative flex min-w-0 flex-1 flex-col">
+                          <AnimatePresence mode="popLayout" initial={false}>
+                            <motion.span
+                              key={selectedCategory}
+                              initial={{ opacity: 0, y: 14 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -14 }}
+                              transition={SPRING}
+                              className="flex min-w-0 flex-col gap-[5px]"
+                            >
+                              <span className="text-[13px] font-semibold text-muted-foreground">
+                                Category
+                              </span>
+                              <span className="flex min-w-0 items-center gap-2">
+                                {isRandomMix && (
+                                  <Shuffle className="size-5 shrink-0 text-pink" />
+                                )}
+                                <span className="truncate font-display text-[26px] leading-none font-extrabold lowercase tracking-[-0.03em] text-highlight">
+                                  {isRandomMix
+                                    ? "random mix"
+                                    : (selectedCategoryInfo?.label ??
+                                      "pick one")}
+                                </span>
+                              </span>
+                              <span className="flex items-baseline gap-1 text-[13px] text-muted-foreground">
+                                {isRandomMix ? (
+                                  <>
+                                    picks from{" "}
+                                    <RollingNumber value={randomPoolCount} /> of{" "}
+                                    {CATEGORY_KEYS.length}
+                                  </>
+                                ) : (
+                                  <>
+                                    <RollingNumber value={selectedWordCount} />{" "}
+                                    words
+                                  </>
+                                )}
+                              </span>
+                            </motion.span>
+                          </AnimatePresence>
                         </span>
-                        <span className="shrink-0 text-[13px] text-muted-foreground">
-                          {currentPlayer} / {playersCount}
+                        <ChevronRight className="size-5 shrink-0 stroke-[2.2] text-muted-foreground" />
+                      </motion.button>
+                    </motion.div>
+
+                    <motion.div
+                      variants={RISE}
+                      className="flex shrink-0 flex-col gap-2.5"
+                    >
+                      <div className="flex items-baseline justify-between gap-3 px-1">
+                        <span
+                          id="difficulty-label"
+                          className="text-[13px] font-semibold text-muted-foreground"
+                        >
+                          Difficulty
+                        </span>
+                        <span className="relative h-5 min-w-0 flex-1 overflow-hidden text-right">
+                          <AnimatePresence mode="popLayout" initial={false}>
+                            <motion.span
+                              key={selectedDifficulty}
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -10 }}
+                              transition={SPRING}
+                              className="block truncate text-[13px] text-muted-foreground/80"
+                            >
+                              {DIFFICULTY_DESCRIPTIONS[selectedDifficulty]}
+                            </motion.span>
+                          </AnimatePresence>
                         </span>
                       </div>
-                    </SwipeCard>
-                  </motion.div>
+                      <div
+                        role="radiogroup"
+                        aria-labelledby="difficulty-label"
+                        className="grid grid-cols-3 rounded-full bg-card p-1"
+                      >
+                        {DIFFICULTIES.map((difficulty) => {
+                          const isSelected = difficulty === selectedDifficulty;
+                          return (
+                            <button
+                              key={difficulty}
+                              type="button"
+                              role="radio"
+                              aria-checked={isSelected}
+                              onClick={() => {
+                                haptic.tap();
+                                setSelectedDifficulty(difficulty);
+                              }}
+                              className={cn(
+                                "relative h-[42px] cursor-pointer rounded-full text-[15px] transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
+                                isSelected
+                                  ? "font-bold text-primary-foreground"
+                                  : "font-semibold text-foreground",
+                              )}
+                            >
+                              {isSelected && (
+                                <motion.span
+                                  layoutId="difficulty-pill"
+                                  transition={SPRING}
+                                  className="absolute inset-0 rounded-full bg-primary"
+                                />
+                              )}
+                              <span className="relative">
+                                {DIFFICULTY_LABELS[difficulty]}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
 
-                  {fellowImposters.length > 0 && (
                     <motion.div
-                      variants={{ ...RISE, exit: FADE_OUT }}
-                      className="flex items-center gap-2 rounded-full bg-card px-4 py-2.5 text-sm font-semibold"
+                      variants={RISE}
+                      className="flex shrink-0 flex-col divide-y divide-border/70 rounded-[24px] bg-card pr-3 pl-[18px]"
                     >
-                      <span className="text-muted-foreground">
-                        {fellowImposters.length === 1
-                          ? "fellow imposter:"
-                          : "fellow imposters:"}
-                      </span>
-                      <span className="text-pink">
-                        {fellowImposters
-                          .map((number) => `player ${number}`)
-                          .join(" · ")}
-                      </span>
+                      <SettingRow
+                        id="randomize-starter"
+                        title="Random first speaker"
+                      >
+                        <Switch
+                          id="randomize-starter"
+                          checked={randomizeStarter}
+                          onCheckedChange={setRandomizeStarter}
+                        />
+                      </SettingRow>
+                      <AnimatePresence initial={false}>
+                        {canRevealFellows && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={SPRING}
+                            className="overflow-hidden"
+                          >
+                            <SettingRow
+                              id="fellow-imposters"
+                              title="Imposters know each other"
+                            >
+                              <Switch
+                                id="fellow-imposters"
+                                checked={revealFellowImposters}
+                                onCheckedChange={setRevealFellowImposters}
+                              />
+                            </SettingRow>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                      <SettingRow id="prank-probability" title="Prank rounds">
+                        <NumberStepper
+                          id="prank-probability"
+                          label="prank chance"
+                          size="sm"
+                          min={0}
+                          max={100}
+                          value={prankProbability}
+                          onChange={setPrankProbability}
+                          onPick={() => openNumberPicker("prank")}
+                          suffix="%"
+                        />
+                      </SettingRow>
                     </motion.div>
-                  )}
+                  </motion.div>
+                )}
 
-                  {activeCategoryInfo?.hint && (
-                    <motion.div variants={{ ...RISE, exit: FADE_OUT }}>
-                      <CategoryHint hint={activeCategoryInfo.hint} />
-                    </motion.div>
-                  )}
-                </motion.div>
-              )}
-
-              {gameState === "end" && (
-                <motion.div
-                  key="end"
-                  variants={STAGGER}
-                  initial="initial"
-                  animate="animate"
-                  exit={FADE_OUT}
-                  className="flex min-h-0 flex-1 flex-col items-center justify-center gap-7 text-center"
-                >
-                  <motion.span
-                    variants={POP}
-                    className="flex size-16 items-center justify-center rounded-full bg-card"
+                {gameState === "pass" && (
+                  <motion.div
+                    key={panelKey}
+                    variants={PASS_VARIANTS}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 text-center"
                   >
-                    <VenetianMask className="size-8 text-pink" aria-hidden />
-                  </motion.span>
-                  <motion.div variants={RISE} className="flex flex-col gap-2">
-                    <h2 className="font-display text-4xl font-extrabold tracking-[-0.03em]">
-                      all clear
-                    </h2>
-                    <p className="mx-auto max-w-xs text-[15px] text-muted-foreground">
-                      everyone has seen their card. put the phone down and start
-                      talking.
-                    </p>
-                  </motion.div>
-                  {startingPlayer && (
-                    <motion.div
-                      variants={DROP_CARD}
-                      className="w-full max-w-xs rounded-[28px] bg-card p-5 shadow-[8px_8px_0_var(--pink)]"
+                    <motion.span
+                      variants={RISE}
+                      className="text-base font-semibold text-muted-foreground"
                     >
-                      <span className="flex items-center justify-center gap-2 text-sm font-semibold text-muted-foreground">
-                        <Shuffle className="size-4 text-pink" aria-hidden />
-                        first to speak
-                      </span>
-                      <p className="mt-2 font-display text-4xl font-extrabold tracking-[-0.03em] text-highlight">
-                        player {startingPlayer}
-                      </p>
-                      <p className="mt-1 text-[13px] text-muted-foreground">
-                        gives the first clue.
+                      pass the phone to
+                    </motion.span>
+                    <motion.p
+                      variants={PLAYER_POP}
+                      className="font-display text-6xl font-extrabold tracking-[-0.03em] text-highlight"
+                    >
+                      player {currentPlayer}
+                    </motion.p>
+                    <motion.p
+                      variants={RISE}
+                      className="max-w-[16rem] text-sm text-muted-foreground"
+                    >
+                      make sure nobody else is peeking.
+                    </motion.p>
+                  </motion.div>
+                )}
+
+                {gameState === "reveal" && (
+                  <motion.div
+                    key={panelKey}
+                    variants={STAGGER}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 py-5"
+                  >
+                    <motion.div
+                      variants={CARD_VARIANTS}
+                      className="h-[min(420px,52dvh)] w-full max-w-[310px]"
+                    >
+                      <SwipeCard onSwipe={passWithSwipe}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold text-muted-foreground">
+                            {currentAssignment?.isImposter
+                              ? "your role"
+                              : "your word"}
+                          </span>
+                          <VenetianMask
+                            className="size-6 text-pink"
+                            aria-hidden
+                          />
+                        </div>
+                        {currentAssignment?.isImposter ? (
+                          <div className="flex flex-col items-center gap-2 text-center">
+                            <span className="text-base font-semibold">
+                              you are the
+                            </span>
+                            <p className="font-display text-[40px] font-extrabold leading-[1.05] tracking-[-0.03em] text-pink">
+                              imposter
+                            </p>
+                          </div>
+                        ) : (
+                          <p
+                            className={cn(
+                              "text-center font-display font-extrabold leading-[1.05] tracking-[-0.03em] break-words text-highlight",
+                              wordSizeClass(currentAssignment?.word ?? ""),
+                            )}
+                          >
+                            {currentAssignment?.word ?? "no word"}
+                          </p>
+                        )}
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="truncate rounded-full bg-secondary px-3.5 py-2 text-sm font-bold lowercase">
+                            {activeCategoryInfo?.label}
+                          </span>
+                          <span className="shrink-0 text-[13px] text-muted-foreground">
+                            {currentPlayer} / {playersCount}
+                          </span>
+                        </div>
+                      </SwipeCard>
+                    </motion.div>
+
+                    {fellowImposters.length > 0 && (
+                      <motion.div
+                        variants={{ ...RISE, exit: FADE_OUT }}
+                        className="flex items-center gap-2 rounded-full bg-card px-4 py-2.5 text-sm font-semibold"
+                      >
+                        <span className="text-muted-foreground">
+                          {fellowImposters.length === 1
+                            ? "fellow imposter:"
+                            : "fellow imposters:"}
+                        </span>
+                        <span className="text-pink">
+                          {fellowImposters
+                            .map((number) => `player ${number}`)
+                            .join(" · ")}
+                        </span>
+                      </motion.div>
+                    )}
+
+                    {activeCategoryInfo?.hint && (
+                      <motion.div variants={{ ...RISE, exit: FADE_OUT }}>
+                        <CategoryHint hint={activeCategoryInfo.hint} />
+                      </motion.div>
+                    )}
+                  </motion.div>
+                )}
+
+                {gameState === "end" && (
+                  <motion.div
+                    key="end"
+                    variants={STAGGER}
+                    initial="initial"
+                    animate="animate"
+                    exit={FADE_OUT}
+                    className="flex min-h-0 flex-1 flex-col items-center justify-center gap-7 text-center"
+                  >
+                    <motion.span
+                      variants={POP}
+                      className="flex size-16 items-center justify-center rounded-full bg-card"
+                    >
+                      <VenetianMask className="size-8 text-pink" aria-hidden />
+                    </motion.span>
+                    <motion.div variants={RISE} className="flex flex-col gap-2">
+                      <h2 className="font-display text-4xl font-extrabold tracking-[-0.03em]">
+                        all clear
+                      </h2>
+                      <p className="mx-auto max-w-xs text-[15px] text-muted-foreground">
+                        everyone has seen their card. put the phone down and
+                        start talking.
                       </p>
                     </motion.div>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </main>
-
-          <motion.footer
-            initial={{ opacity: 0, y: 16 }}
-            animate={
-              hasLaunched
-                ? { opacity: 1, y: 0, transition: { ...SOFT_SPRING, delay: 0.12 } }
-                : { opacity: 0, y: 16 }
-            }
-            className="shrink-0 pt-4"
-          >
-            <Button
-              onClick={primaryAction}
-              size="lg"
-              className="relative w-full overflow-hidden"
-              disabled={primaryDisabled}
-            >
-              <AnimatePresence mode="popLayout" initial={false}>
-                <motion.span
-                  key={primaryLabel}
-                  initial={{ opacity: 0, y: 18 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -18 }}
-                  transition={SPRING}
-                  className="flex items-center gap-2"
-                >
-                  {!primaryIconAtEnd && (
-                    <PrimaryIcon className="size-5 stroke-[2.4]" />
-                  )}
-                  {primaryLabel}
-                  {primaryIconAtEnd && (
-                    <PrimaryIcon className="size-[22px] stroke-[2.6]" />
-                  )}
-                </motion.span>
+                    {startingPlayer && (
+                      <motion.div
+                        variants={DROP_CARD}
+                        className="w-full max-w-xs rounded-[28px] bg-card p-5 shadow-[8px_8px_0_var(--pink)]"
+                      >
+                        <span className="flex items-center justify-center gap-2 text-sm font-semibold text-muted-foreground">
+                          <Shuffle className="size-4 text-pink" aria-hidden />
+                          first to speak
+                        </span>
+                        <p className="mt-2 font-display text-4xl font-extrabold tracking-[-0.03em] text-highlight">
+                          player {startingPlayer}
+                        </p>
+                        <p className="mt-1 text-[13px] text-muted-foreground">
+                          gives the first clue.
+                        </p>
+                      </motion.div>
+                    )}
+                  </motion.div>
+                )}
               </AnimatePresence>
-            </Button>
+            </main>
+
+            <motion.footer
+              initial={{ opacity: 0, y: 16 }}
+              animate={
+                hasLaunched
+                  ? {
+                      opacity: 1,
+                      y: 0,
+                      transition: { ...SOFT_SPRING, delay: 0.12 },
+                    }
+                  : { opacity: 0, y: 16 }
+              }
+              className="shrink-0 pt-4"
+            >
+              <Button
+                onClick={primaryAction}
+                size="lg"
+                className="relative w-full overflow-hidden"
+                disabled={primaryDisabled}
+              >
+                <AnimatePresence mode="popLayout" initial={false}>
+                  <motion.span
+                    key={primaryLabel}
+                    initial={{ opacity: 0, y: 18 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -18 }}
+                    transition={SPRING}
+                    className="flex items-center gap-2"
+                  >
+                    {!primaryIconAtEnd && (
+                      <PrimaryIcon className="size-5 stroke-[2.4]" />
+                    )}
+                    {primaryLabel}
+                    {primaryIconAtEnd && (
+                      <PrimaryIcon className="size-[22px] stroke-[2.6]" />
+                    )}
+                  </motion.span>
+                </AnimatePresence>
+              </Button>
+              <AnimatePresence initial={false}>
+                {gameState === "setup" && primaryDisabled && (
+                  <motion.p
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={SPRING}
+                    className="overflow-hidden pt-2 text-center text-[13px] font-semibold text-pink"
+                  >
+                    {impostersCount >= playersCount
+                      ? "need more players than imposters."
+                      : "pick at least one category for the random mix."}
+                  </motion.p>
+                )}
+              </AnimatePresence>
+            </motion.footer>
+          </div>
+
+          {/* Category picker */}
+          <Sheet
+            open={showCategorySheet}
+            predictive={backTarget === "category"}
+            onClose={() => setShowCategorySheet(false)}
+            labelledBy="category-sheet-title"
+            header={
+              <div className="flex h-11 items-center justify-between">
+                <h2
+                  id="category-sheet-title"
+                  className="font-display text-[22px] font-extrabold tracking-[-0.02em]"
+                >
+                  pick a category
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="-mr-2.5"
+                  onClick={() => setShowCategorySheet(false)}
+                  aria-label="Close"
+                >
+                  <X className="size-[18px] stroke-[2.2]" />
+                </Button>
+              </div>
+            }
+          >
+            <div
+              role="radiogroup"
+              aria-label="Category mode"
+              className="grid shrink-0 grid-cols-2 rounded-full bg-background p-1"
+            >
+              {[
+                { random: false, label: "one category" },
+                { random: true, label: "random mix" },
+              ].map((mode) => {
+                const isSelected = mode.random === isRandomMix;
+                return (
+                  <button
+                    key={mode.label}
+                    type="button"
+                    role="radio"
+                    aria-checked={isSelected}
+                    onClick={() => {
+                      haptic.tap();
+                      setSelectedCategory(
+                        mode.random ? "random" : lastSingleCategory,
+                      );
+                    }}
+                    className={cn(
+                      "relative flex h-11 cursor-pointer items-center justify-center gap-2 rounded-full text-[15px] transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
+                      isSelected
+                        ? "font-bold text-primary-foreground"
+                        : "font-semibold text-foreground",
+                    )}
+                  >
+                    {isSelected && (
+                      <motion.span
+                        layoutId="category-mode-pill"
+                        transition={SPRING}
+                        className="absolute inset-0 rounded-full bg-primary"
+                      />
+                    )}
+                    {mode.random && (
+                      <Shuffle
+                        className={cn(
+                          "relative size-4 transition-colors",
+                          !isSelected && "text-pink",
+                        )}
+                        aria-hidden
+                      />
+                    )}
+                    <span className="relative">{mode.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
             <AnimatePresence initial={false}>
-              {gameState === "setup" && primaryDisabled && (
-                <motion.p
+              {isRandomMix && (
+                <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
                   transition={SPRING}
-                  className="overflow-hidden pt-2 text-center text-[13px] font-semibold text-pink"
+                  className="shrink-0 overflow-hidden"
                 >
-                  {impostersCount >= playersCount
-                    ? "need more players than imposters."
-                    : "pick at least one category for the random mix."}
-                </motion.p>
+                  <div className="flex min-h-11 items-center justify-between">
+                    <span className="flex items-baseline gap-1 text-sm text-muted-foreground">
+                      picks from
+                      <span className="flex items-baseline gap-1 font-bold text-foreground">
+                        <RollingNumber value={randomPoolCount} /> of{" "}
+                        {CATEGORY_KEYS.length}
+                      </span>
+                    </span>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-11 font-bold text-highlight hover:text-highlight"
+                        onClick={() =>
+                          setRandomPool(
+                            Object.fromEntries(
+                              CATEGORY_KEYS.map((k) => [k, true]),
+                            ),
+                          )
+                        }
+                      >
+                        select all
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-11"
+                        onClick={() =>
+                          setRandomPool(
+                            Object.fromEntries(
+                              CATEGORY_KEYS.map((k) => [k, false]),
+                            ),
+                          )
+                        }
+                      >
+                        clear
+                      </Button>
+                    </div>
+                  </div>
+                </motion.div>
               )}
             </AnimatePresence>
-          </motion.footer>
-        </div>
 
-        {/* Category picker */}
-        <Sheet
-          open={showCategorySheet}
-          predictive={backTarget === "category"}
-          onClose={() => setShowCategorySheet(false)}
-          labelledBy="category-sheet-title"
-          header={
-            <div className="flex h-11 items-center justify-between">
-              <h2
-                id="category-sheet-title"
-                className="font-display text-[22px] font-extrabold tracking-[-0.02em]"
-              >
-                pick a category
-              </h2>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="-mr-2.5"
-                onClick={() => setShowCategorySheet(false)}
-                aria-label="Close"
-              >
-                <X className="size-[18px] stroke-[2.2]" />
-              </Button>
-            </div>
-          }
-        >
-          <div
-            role="radiogroup"
-            aria-label="Category mode"
-            className="grid shrink-0 grid-cols-2 rounded-full bg-background p-1"
-          >
-            {[
-              { random: false, label: "one category" },
-              { random: true, label: "random mix" },
-            ].map((mode) => {
-              const isSelected = mode.random === isRandomMix;
-              return (
-                <button
-                  key={mode.label}
-                  type="button"
-                  role="radio"
-                  aria-checked={isSelected}
-                  onClick={() => {
-                    haptic.tap();
-                    setSelectedCategory(mode.random ? "random" : lastSingleCategory);
-                  }}
-                  className={cn(
-                    "relative flex h-11 cursor-pointer items-center justify-center gap-2 rounded-full text-[15px] transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
-                    isSelected
-                      ? "font-bold text-primary-foreground"
-                      : "font-semibold text-foreground",
-                  )}
-                >
-                  {isSelected && (
-                    <motion.span
-                      layoutId="category-mode-pill"
-                      transition={SPRING}
-                      className="absolute inset-0 rounded-full bg-primary"
-                    />
-                  )}
-                  {mode.random && (
-                    <Shuffle
-                      className={cn(
-                        "relative size-4 transition-colors",
-                        !isSelected && "text-pink",
-                      )}
-                      aria-hidden
-                    />
-                  )}
-                  <span className="relative">{mode.label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          <AnimatePresence initial={false}>
-            {isRandomMix && (
+            <div className="-mx-5 min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-0.5">
               <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={SPRING}
-                className="shrink-0 overflow-hidden"
+                variants={{
+                  initial: {},
+                  animate: {
+                    transition: { staggerChildren: 0.006, delayChildren: 0.02 },
+                  },
+                }}
+                initial="initial"
+                animate="animate"
+                className="grid grid-cols-2 gap-1.5"
               >
-                <div className="flex min-h-11 items-center justify-between">
-                  <span className="flex items-baseline gap-1 text-sm text-muted-foreground">
-                    picks from
-                    <span className="flex items-baseline gap-1 font-bold text-foreground">
-                      <RollingNumber value={randomPoolCount} /> of{" "}
-                      {CATEGORY_KEYS.length}
-                    </span>
-                  </span>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-11 font-bold text-highlight hover:text-highlight"
-                      onClick={() =>
-                        setRandomPool(
-                          Object.fromEntries(CATEGORY_KEYS.map((k) => [k, true])),
-                        )
-                      }
-                    >
-                      select all
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-11"
-                      onClick={() =>
-                        setRandomPool(
-                          Object.fromEntries(CATEGORY_KEYS.map((k) => [k, false])),
-                        )
-                      }
-                    >
-                      clear
-                    </Button>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                {CATEGORY_KEYS.map((key) => {
+                  const category = CATEGORIES[key];
 
-          <div className="-mx-5 min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-0.5">
-            <motion.div
-              variants={{
-                initial: {},
-                animate: { transition: { staggerChildren: 0.006, delayChildren: 0.02 } },
-              }}
-              initial="initial"
-              animate="animate"
-              className="grid grid-cols-2 gap-1.5"
-            >
-              {CATEGORY_KEYS.map((key) => {
-                const category = CATEGORIES[key];
+                  if (!isRandomMix) {
+                    const isSelected = key === selectedCategory;
+                    return (
+                      <motion.button
+                        key={key}
+                        variants={TILE}
+                        whileTap={{ scale: 0.96 }}
+                        type="button"
+                        aria-pressed={isSelected}
+                        onClick={() => {
+                          haptic.tap();
+                          pickSingleCategory(key);
+                        }}
+                        className={cn(
+                          "relative isolate flex h-[54px] cursor-pointer flex-col items-start justify-center gap-0.5 rounded-2xl bg-secondary px-3.5 text-left transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
+                          isSelected
+                            ? "text-primary-foreground"
+                            : "text-secondary-foreground",
+                        )}
+                      >
+                        {/* Pops in place: a pill gliding across a 2-column grid would cut over other tiles. */}
+                        <AnimatePresence initial={false}>
+                          {isSelected && (
+                            <motion.span
+                              initial={{ opacity: 0, scale: 0.85 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.95 }}
+                              transition={SPRING}
+                              className="absolute inset-0 -z-10 rounded-2xl bg-primary"
+                            />
+                          )}
+                        </AnimatePresence>
+                        <span
+                          className={cn(
+                            "max-w-full truncate text-[15px] leading-tight lowercase",
+                            isSelected ? "font-bold" : "font-semibold",
+                          )}
+                        >
+                          {category.label}
+                        </span>
+                        <span
+                          className={cn(
+                            "flex items-center gap-1.5 text-xs whitespace-nowrap transition-colors duration-200",
+                            isSelected
+                              ? "text-primary-foreground/70"
+                              : "text-muted-foreground/80",
+                          )}
+                        >
+                          {
+                            getUniqueCategoryWords(category, selectedDifficulty)
+                              .length
+                          }{" "}
+                          words
+                          {category.tag && (
+                            <CategorySticker
+                              tag={category.tag}
+                              onPrimary={isSelected}
+                            />
+                          )}
+                        </span>
+                      </motion.button>
+                    );
+                  }
 
-                if (!isRandomMix) {
-                  const isSelected = key === selectedCategory;
+                  const isIncluded = !!randomPool[key];
                   return (
                     <motion.button
                       key={key}
                       variants={TILE}
                       whileTap={{ scale: 0.96 }}
                       type="button"
-                      aria-pressed={isSelected}
+                      role="checkbox"
+                      aria-checked={isIncluded}
                       onClick={() => {
                         haptic.tap();
-                        pickSingleCategory(key);
+                        setRandomPool((prev) => ({
+                          ...prev,
+                          [key]: !isIncluded,
+                        }));
                       }}
                       className={cn(
-                        "relative isolate flex h-[54px] cursor-pointer flex-col items-start justify-center gap-0.5 rounded-2xl bg-secondary px-3.5 text-left transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
-                        isSelected
-                          ? "text-primary-foreground"
-                          : "text-secondary-foreground",
+                        "relative flex h-[54px] cursor-pointer flex-col items-start justify-center gap-0.5 rounded-2xl border-[1.5px] px-3.5 text-left transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
+                        isIncluded
+                          ? "border-transparent bg-secondary text-secondary-foreground"
+                          : "border-border bg-transparent text-muted-foreground",
                       )}
                     >
-                      {/* Pops in place: a pill gliding across a 2-column grid would cut over other tiles. */}
-                      <AnimatePresence initial={false}>
-                        {isSelected && (
-                          <motion.span
-                            initial={{ opacity: 0, scale: 0.85 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            transition={SPRING}
-                            className="absolute inset-0 -z-10 rounded-2xl bg-primary"
-                          />
-                        )}
-                      </AnimatePresence>
                       <span
                         className={cn(
-                          "max-w-full truncate text-[15px] leading-tight lowercase",
-                          isSelected ? "font-bold" : "font-semibold",
+                          "max-w-[calc(100%-1.75rem)] truncate text-[15px] leading-tight lowercase",
+                          isIncluded
+                            ? "font-semibold"
+                            : "font-medium line-through",
                         )}
                       >
                         {category.label}
                       </span>
+                      <span className="flex items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground/80">
+                        {
+                          getUniqueCategoryWords(category, selectedDifficulty)
+                            .length
+                        }{" "}
+                        words
+                        {category.tag && <CategorySticker tag={category.tag} />}
+                      </span>
                       <span
-                        className={cn(
-                          "flex items-center gap-1.5 text-xs whitespace-nowrap transition-colors duration-200",
-                          isSelected
-                            ? "text-primary-foreground/70"
-                            : "text-muted-foreground/80",
-                        )}
+                        className="absolute top-2 right-2.5 flex size-5 items-center justify-center rounded-full border-2 border-muted-foreground/60"
+                        aria-hidden="true"
                       >
-                        {getUniqueCategoryWords(category, selectedDifficulty).length} words
-                        {category.tag && (
-                          <CategorySticker tag={category.tag} onPrimary={isSelected} />
-                        )}
+                        <AnimatePresence initial={false}>
+                          {isIncluded && (
+                            <motion.span
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              exit={{ scale: 0 }}
+                              transition={{
+                                type: "spring",
+                                stiffness: 800,
+                                damping: 32,
+                              }}
+                              className="absolute -inset-0.5 flex items-center justify-center rounded-full bg-primary text-primary-foreground"
+                            >
+                              <Check className="size-3 stroke-[3.5]" />
+                            </motion.span>
+                          )}
+                        </AnimatePresence>
                       </span>
                     </motion.button>
                   );
-                }
-
-                const isIncluded = !!randomPool[key];
-                return (
-                  <motion.button
-                    key={key}
-                    variants={TILE}
-                    whileTap={{ scale: 0.96 }}
-                    type="button"
-                    role="checkbox"
-                    aria-checked={isIncluded}
-                    onClick={() => {
-                      haptic.tap();
-                      setRandomPool((prev) => ({
-                        ...prev,
-                        [key]: !isIncluded,
-                      }));
-                    }}
-                    className={cn(
-                      "relative flex h-[54px] cursor-pointer flex-col items-start justify-center gap-0.5 rounded-2xl border-[1.5px] px-3.5 text-left transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
-                      isIncluded
-                        ? "border-transparent bg-secondary text-secondary-foreground"
-                        : "border-border bg-transparent text-muted-foreground",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "max-w-[calc(100%-1.75rem)] truncate text-[15px] leading-tight lowercase",
-                        isIncluded ? "font-semibold" : "font-medium line-through",
-                      )}
-                    >
-                      {category.label}
-                    </span>
-                    <span className="flex items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground/80">
-                      {getUniqueCategoryWords(category, selectedDifficulty).length} words
-                      {category.tag && <CategorySticker tag={category.tag} />}
-                    </span>
-                    <span
-                      className="absolute top-2 right-2.5 flex size-5 items-center justify-center rounded-full border-2 border-muted-foreground/60"
-                      aria-hidden="true"
-                    >
-                      <AnimatePresence initial={false}>
-                        {isIncluded && (
-                          <motion.span
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            exit={{ scale: 0 }}
-                            transition={{ type: "spring", stiffness: 800, damping: 32 }}
-                            className="absolute -inset-0.5 flex items-center justify-center rounded-full bg-primary text-primary-foreground"
-                          >
-                            <Check className="size-3 stroke-[3.5]" />
-                          </motion.span>
-                        )}
-                      </AnimatePresence>
-                    </span>
-                  </motion.button>
-                );
-              })}
-            </motion.div>
-          </div>
-
-          <Button
-            size="lg"
-            className="h-[52px] shrink-0 text-[17px]"
-            onClick={() => setShowCategorySheet(false)}
-          >
-            done
-          </Button>
-        </Sheet>
-
-        {/* How to play */}
-        <Sheet
-          open={showInfoModal}
-          predictive={backTarget === "info"}
-          onClose={() => setShowInfoModal(false)}
-          labelledBy="info-sheet-title"
-          className="gap-5"
-          header={
-            <div className="flex h-11 items-center justify-between">
-              <h2
-                id="info-sheet-title"
-                className="font-display text-[22px] font-extrabold tracking-[-0.02em]"
-              >
-                how to play
-              </h2>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="-mr-2.5"
-                onClick={() => setShowInfoModal(false)}
-                aria-label="Close"
-              >
-                <X className="size-5 stroke-[2.2]" />
-              </Button>
+                })}
+              </motion.div>
             </div>
-          }
-        >
-          <motion.ol
-            variants={STAGGER}
-            initial="initial"
-            animate="animate"
-            className="flex flex-col gap-3.5 overflow-y-auto text-[15px] leading-relaxed"
+
+            <Button
+              size="lg"
+              className="h-[52px] shrink-0 text-[17px]"
+              onClick={() => setShowCategorySheet(false)}
+            >
+              done
+            </Button>
+          </Sheet>
+
+          {/* How to play */}
+          <Sheet
+            open={showInfoModal}
+            predictive={backTarget === "info"}
+            onClose={() => setShowInfoModal(false)}
+            labelledBy="info-sheet-title"
+            className="gap-5"
+            header={
+              <div className="flex h-11 items-center justify-between">
+                <h2
+                  id="info-sheet-title"
+                  className="font-display text-[22px] font-extrabold tracking-[-0.02em]"
+                >
+                  how to play
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="-mr-2.5"
+                  onClick={() => setShowInfoModal(false)}
+                  aria-label="Close"
+                >
+                  <X className="size-5 stroke-[2.2]" />
+                </Button>
+              </div>
+            }
           >
-            {[
-              "Pass the phone around so everyone can check their card in private.",
-              "Most players see a secret word. The imposter only sees the category.",
-              "Go around the room and say one clue each. Too obvious, and the imposter catches on. Too vague, and everyone votes you out.",
-              "Once everyone has spoken, argue and point fingers.",
-            ].map((step, index) => (
-              <motion.li key={step} variants={RISE} className="flex gap-3">
-                <span className="w-4 shrink-0 font-display text-base font-extrabold text-pink">
-                  {index + 1}
-                </span>
-                <span>{step}</span>
-              </motion.li>
-            ))}
-          </motion.ol>
-
-        </Sheet>
-
-        {/* Number picker: tap a number instead of typing one */}
-        <Sheet
-          open={isNumberPickerOpen}
-          predictive={backTarget === "picker"}
-          onClose={() => setIsNumberPickerOpen(false)}
-          labelledBy="number-picker-title"
-          header={
-            <div className="flex h-11 items-center justify-between">
-              <h2
-                id="number-picker-title"
-                className="font-display text-[22px] font-extrabold tracking-[-0.02em]"
-              >
-                {numberPicker.title}
-              </h2>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="-mr-2.5"
-                onClick={() => setIsNumberPickerOpen(false)}
-                aria-label="Close"
-              >
-                <X className="size-5 stroke-[2.2]" />
-              </Button>
-            </div>
-          }
-        >
-          {numberPickerKind === "prank" ? (
-            // Prank chance needs 1% precision, so it gets a slider instead of a grid.
-            <motion.div
+            <motion.ol
               variants={STAGGER}
               initial="initial"
               animate="animate"
-              className="flex flex-col gap-5 pb-1"
+              className="flex flex-col gap-3.5 overflow-y-auto text-[15px] leading-relaxed"
             >
-              <motion.div variants={RISE} className="flex items-center justify-between">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label="Less prank chance"
-                  disabled={prankProbability <= 0}
-                  onClick={() => {
-                    haptic.tap();
-                    setPrankProbability(Math.max(0, prankProbability - 1));
-                  }}
-                >
-                  <Minus className="size-5 stroke-[2.5]" />
-                </Button>
-                <span className="flex items-baseline font-display text-5xl font-extrabold tabular-nums">
-                  <RollingNumber value={prankProbability} />
-                  <span className="text-3xl">%</span>
-                </span>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label="More prank chance"
-                  disabled={prankProbability >= 100}
-                  onClick={() => {
-                    haptic.tap();
-                    setPrankProbability(Math.min(100, prankProbability + 1));
-                  }}
-                >
-                  <Plus className="size-5 stroke-[2.5]" />
-                </Button>
-              </motion.div>
-              <motion.input
-                variants={RISE}
-                type="range"
-                min={0}
-                max={100}
-                step={1}
-                value={prankProbability}
-                aria-label="Prank chance"
-                onChange={(event) => {
-                  const nextValue = Number(event.target.value);
-                  // Tick on every 5% so dragging feels notched without buzzing constantly.
-                  if (nextValue % 5 === 0) haptic.tap();
-                  setPrankProbability(nextValue);
-                }}
-                style={{ "--fill": `${prankProbability}%` } as CSSProperties}
-                className="range-slider w-full"
-              />
-              <motion.div variants={RISE} className="grid grid-cols-6 gap-2">
-                {PRANK_PRESETS.map((preset) => (
-                  <motion.button
-                    key={preset}
-                    type="button"
-                    whileTap={{ scale: 0.92 }}
-                    onClick={() => {
-                      haptic.tap();
-                      setPrankProbability(preset);
-                    }}
-                    className={cn(
-                      "h-11 cursor-pointer rounded-full text-sm font-bold tabular-nums transition-colors duration-150 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
-                      preset === prankProbability
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-secondary text-secondary-foreground",
-                    )}
-                  >
-                    {preset}%
-                  </motion.button>
-                ))}
-              </motion.div>
-              <motion.div variants={RISE}>
-                <Button
-                  size="lg"
-                  className="h-[52px] w-full text-[17px]"
-                  onClick={() => setIsNumberPickerOpen(false)}
-                >
-                  done
-                </Button>
-              </motion.div>
-            </motion.div>
-          ) : (
-          <motion.div
-              variants={{
-                initial: {},
-                animate: { transition: { staggerChildren: 0.008, delayChildren: 0.02 } },
-              }}
-              initial="initial"
-              animate="animate"
-              role="radiogroup"
-              aria-labelledby="number-picker-title"
-              className={cn(
-                "grid gap-2 pb-1",
-                numberPicker.suffix ? "grid-cols-4" : "grid-cols-6",
-              )}
-            >
-              {numberPicker.options.map((option) => {
-                const isSelected = option === numberPicker.value;
-                return (
-                  <motion.button
-                    key={option}
-                    variants={TILE}
-                    whileTap={{ scale: 0.92 }}
-                    type="button"
-                    role="radio"
-                    aria-checked={isSelected}
-                    onClick={() => {
-                      haptic.tap();
-                      numberPicker.apply(option);
-                      window.setTimeout(() => setIsNumberPickerOpen(false), 140);
-                    }}
-                    className={cn(
-                      "h-14 cursor-pointer rounded-2xl font-display text-xl font-extrabold tabular-nums transition-colors duration-150 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
-                      isSelected
-                        ? numberPickerKind === "imposters"
-                          ? "bg-pink text-pink-foreground"
-                          : "bg-primary text-primary-foreground"
-                        : "bg-secondary text-secondary-foreground",
-                    )}
-                  >
-                    {option}
-                    {numberPicker.suffix}
-                  </motion.button>
-                );
-              })}
-            </motion.div>
-          )}
-        </Sheet>
+              {[
+                "Pass the phone around so everyone can check their card in private.",
+                "Most players see a secret word. The imposter only sees the category.",
+                "Go around the room and say one clue each. Too obvious, and the imposter catches on. Too vague, and everyone votes you out.",
+                "Once everyone has spoken, argue and point fingers.",
+              ].map((step, index) => (
+                <motion.li key={step} variants={RISE} className="flex gap-3">
+                  <span className="w-4 shrink-0 font-display text-base font-extrabold text-pink">
+                    {index + 1}
+                  </span>
+                  <span>{step}</span>
+                </motion.li>
+              ))}
+            </motion.ol>
+          </Sheet>
 
-        {/* Settings */}
-        <Page
-          open={showSettings}
-          predictive={backTarget === "settings"}
-          onClose={() => setShowSettings(false)}
-          title="settings"
-        >
-          <motion.div
-            variants={STAGGER}
-            initial="initial"
-            animate="animate"
-            className="flex flex-col gap-7"
+          {/* Number picker: tap a number instead of typing one */}
+          <Sheet
+            open={isNumberPickerOpen}
+            predictive={backTarget === "picker"}
+            onClose={() => setIsNumberPickerOpen(false)}
+            labelledBy="number-picker-title"
+            header={
+              <div className="flex h-11 items-center justify-between">
+                <h2
+                  id="number-picker-title"
+                  className="font-display text-[22px] font-extrabold tracking-[-0.02em]"
+                >
+                  {numberPicker.title}
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="-mr-2.5"
+                  onClick={() => setIsNumberPickerOpen(false)}
+                  aria-label="Close"
+                >
+                  <X className="size-5 stroke-[2.2]" />
+                </Button>
+              </div>
+            }
           >
-            <motion.section variants={RISE} className="flex flex-col gap-2.5">
-              <span
-                id="theme-label"
-                className="px-1 text-[13px] font-semibold text-muted-foreground"
+            {numberPickerKind === "prank" ? (
+              // Prank chance needs 1% precision, so it gets a slider instead of a grid.
+              <motion.div
+                variants={STAGGER}
+                initial="initial"
+                animate="animate"
+                className="flex flex-col gap-5 pb-1"
               >
-                Theme
-              </span>
-              <div
+                <motion.div
+                  variants={RISE}
+                  className="flex items-center justify-between"
+                >
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    aria-label="Less prank chance"
+                    disabled={prankProbability <= 0}
+                    onClick={() => {
+                      haptic.tap();
+                      setPrankProbability(Math.max(0, prankProbability - 1));
+                    }}
+                  >
+                    <Minus className="size-5 stroke-[2.5]" />
+                  </Button>
+                  <span className="flex items-baseline font-display text-5xl font-extrabold tabular-nums">
+                    <RollingNumber value={prankProbability} />
+                    <span className="text-3xl">%</span>
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    aria-label="More prank chance"
+                    disabled={prankProbability >= 100}
+                    onClick={() => {
+                      haptic.tap();
+                      setPrankProbability(Math.min(100, prankProbability + 1));
+                    }}
+                  >
+                    <Plus className="size-5 stroke-[2.5]" />
+                  </Button>
+                </motion.div>
+                <motion.input
+                  variants={RISE}
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={prankProbability}
+                  aria-label="Prank chance"
+                  onChange={(event) => {
+                    const nextValue = Number(event.target.value);
+                    // Tick on every 5% so dragging feels notched without buzzing constantly.
+                    if (nextValue % 5 === 0) haptic.tap();
+                    setPrankProbability(nextValue);
+                  }}
+                  style={{ "--fill": `${prankProbability}%` } as CSSProperties}
+                  className="range-slider w-full"
+                />
+                <motion.div variants={RISE} className="grid grid-cols-6 gap-2">
+                  {PRANK_PRESETS.map((preset) => (
+                    <motion.button
+                      key={preset}
+                      type="button"
+                      whileTap={{ scale: 0.92 }}
+                      onClick={() => {
+                        haptic.tap();
+                        setPrankProbability(preset);
+                      }}
+                      className={cn(
+                        "h-11 cursor-pointer rounded-full text-sm font-bold tabular-nums transition-colors duration-150 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
+                        preset === prankProbability
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-secondary text-secondary-foreground",
+                      )}
+                    >
+                      {preset}%
+                    </motion.button>
+                  ))}
+                </motion.div>
+                <motion.div variants={RISE}>
+                  <Button
+                    size="lg"
+                    className="h-[52px] w-full text-[17px]"
+                    onClick={() => setIsNumberPickerOpen(false)}
+                  >
+                    done
+                  </Button>
+                </motion.div>
+              </motion.div>
+            ) : (
+              <motion.div
+                variants={{
+                  initial: {},
+                  animate: {
+                    transition: { staggerChildren: 0.008, delayChildren: 0.02 },
+                  },
+                }}
+                initial="initial"
+                animate="animate"
                 role="radiogroup"
-                aria-labelledby="theme-label"
-                className="grid grid-cols-3 rounded-full bg-card p-1"
+                aria-labelledby="number-picker-title"
+                className={cn(
+                  "grid gap-2 pb-1",
+                  numberPicker.suffix ? "grid-cols-4" : "grid-cols-6",
+                )}
               >
-                {THEME_OPTIONS.map(({ value: option, label }) => {
-                  const isSelected = themePreference === option;
-                  const ThemeIcon =
-                    option === "system" ? SunMoon : option === "dark" ? Moon : Sun;
+                {numberPicker.options.map((option) => {
+                  const isSelected = option === numberPicker.value;
                   return (
-                    <button
+                    <motion.button
                       key={option}
+                      variants={TILE}
+                      whileTap={{ scale: 0.92 }}
                       type="button"
                       role="radio"
                       aria-checked={isSelected}
                       onClick={() => {
                         haptic.tap();
-                        setThemePreference(option);
+                        numberPicker.apply(option);
+                        window.setTimeout(
+                          () => setIsNumberPickerOpen(false),
+                          140,
+                        );
                       }}
                       className={cn(
-                        "relative flex h-[42px] cursor-pointer items-center justify-center gap-2 rounded-full text-[15px] transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
+                        "h-14 cursor-pointer rounded-2xl font-display text-xl font-extrabold tabular-nums transition-colors duration-150 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
                         isSelected
-                          ? "font-bold text-primary-foreground"
-                          : "font-semibold text-foreground",
+                          ? numberPickerKind === "imposters"
+                            ? "bg-pink text-pink-foreground"
+                            : "bg-primary text-primary-foreground"
+                          : "bg-secondary text-secondary-foreground",
                       )}
                     >
-                      {isSelected && (
-                        <motion.span
-                          layoutId="theme-pill"
-                          transition={SPRING}
-                          className="absolute inset-0 rounded-full bg-primary"
-                        />
-                      )}
-                      <ThemeIcon className="relative size-4" />
-                      <span className="relative">{label}</span>
-                    </button>
+                      {option}
+                      {numberPicker.suffix}
+                    </motion.button>
                   );
                 })}
-              </div>
-            </motion.section>
-
-            {isNativeApp && (
-              <motion.section
-                variants={RISE}
-                className="rounded-[24px] bg-card pr-3 pl-[18px]"
-              >
-                <SettingRow id="haptics" title="Vibrations">
-                  <Switch
-                    id="haptics"
-                    checked={hapticsOn}
-                    onCheckedChange={setHapticsOn}
-                  />
-                </SettingRow>
-              </motion.section>
+              </motion.div>
             )}
+          </Sheet>
 
-            <motion.section variants={RISE} className="flex flex-col gap-2.5">
-              <span className="px-1 text-[13px] font-semibold text-muted-foreground">
-                Version
-              </span>
-              <div className="flex flex-col divide-y divide-border/70 rounded-[24px] bg-card px-[18px]">
-                <div className="flex min-h-[54px] items-center justify-between">
-                  <span className="text-[15px] font-medium">Version</span>
-                  <span className="font-display text-sm font-extrabold">
-                    v{APP_VERSION}
-                  </span>
-                </div>
-
-                {isNativeApp ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (updateStatus === "available" || updateStatus === "ready") {
-                        void installUpdate();
-                      } else if (
-                        updateStatus !== "checking" &&
-                        updateStatus !== "downloading"
-                      ) {
-                        void checkForUpdates();
-                      }
-                    }}
-                    // relative: popLayout positions the outgoing status against this row, not the scrolled page.
-                    className="relative flex min-h-[54px] cursor-pointer items-center justify-between gap-3 text-left"
-                  >
-                    <span className="text-[15px] font-medium">Updates</span>
-                    <AnimatePresence mode="popLayout" initial={false}>
-                      <motion.span
-                        key={updateStatus}
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -8 }}
-                        transition={SPRING}
+          {/* Settings */}
+          <Page
+            open={showSettings}
+            predictive={backTarget === "settings"}
+            onClose={() => setShowSettings(false)}
+            title="settings"
+          >
+            <motion.div
+              variants={STAGGER}
+              initial="initial"
+              animate="animate"
+              className="flex flex-col gap-7"
+            >
+              <motion.section variants={RISE} className="flex flex-col gap-2.5">
+                <span
+                  id="theme-label"
+                  className="px-1 text-[13px] font-semibold text-muted-foreground"
+                >
+                  Theme
+                </span>
+                <div
+                  role="radiogroup"
+                  aria-labelledby="theme-label"
+                  className="grid grid-cols-3 rounded-full bg-card p-1"
+                >
+                  {THEME_OPTIONS.map(({ value: option, label }) => {
+                    const isSelected = themePreference === option;
+                    const ThemeIcon =
+                      option === "system"
+                        ? SunMoon
+                        : option === "dark"
+                          ? Moon
+                          : Sun;
+                    return (
+                      <button
+                        key={option}
+                        type="button"
+                        role="radio"
+                        aria-checked={isSelected}
+                        onClick={() => {
+                          haptic.tap();
+                          setThemePreference(option);
+                        }}
                         className={cn(
-                          "flex items-center gap-1.5 text-sm font-semibold",
-                          updateStatus === "available" ||
-                            updateStatus === "downloading" ||
-                            updateStatus === "ready"
-                            ? "text-pink"
-                            : updateStatus === "latest"
-                              ? "text-muted-foreground"
-                              : "text-highlight",
+                          "relative flex h-[42px] cursor-pointer items-center justify-center gap-2 rounded-full text-[15px] transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
+                          isSelected
+                            ? "font-bold text-primary-foreground"
+                            : "font-semibold text-foreground",
                         )}
                       >
-                        {updateStatus === "checking" && (
-                          <>
-                            <Loader2 className="size-4 animate-spin" />
-                            Checking…
-                          </>
+                        {isSelected && (
+                          <motion.span
+                            layoutId="theme-pill"
+                            transition={SPRING}
+                            className="absolute inset-0 rounded-full bg-primary"
+                          />
                         )}
-                        {updateStatus === "latest" && (
-                          <>
-                            <Check className="size-4 stroke-[2.5]" />
-                            Up to date
-                          </>
-                        )}
-                        {updateStatus === "available" && <>v{updateVersion} available</>}
-                        {updateStatus === "downloading" && (
-                          <span className="tabular-nums">
-                            Downloading {Math.round(downloadProgress * 100)}%
+                        <ThemeIcon className="relative size-4" />
+                        <span className="relative">{label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </motion.section>
+
+              {isNativeApp && (
+                <motion.section
+                  variants={RISE}
+                  className="rounded-[24px] bg-card pr-3 pl-[18px]"
+                >
+                  <SettingRow id="haptics" title="Vibrations">
+                    <Switch
+                      id="haptics"
+                      checked={hapticsOn}
+                      onCheckedChange={setHapticsOn}
+                    />
+                  </SettingRow>
+                </motion.section>
+              )}
+
+              <motion.section variants={RISE} className="flex flex-col gap-2.5">
+                <span className="px-1 text-[13px] font-semibold text-muted-foreground">
+                  Version
+                </span>
+                <div className="flex flex-col divide-y divide-border/70 rounded-[24px] bg-card px-[18px]">
+                  <div className="flex min-h-[54px] items-center justify-between">
+                    <span className="text-[15px] font-medium">Version</span>
+                    <span className="font-display text-sm font-extrabold">
+                      v{APP_VERSION}
+                    </span>
+                  </div>
+
+                  {isNativeApp ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (
+                          updateStatus === "available" ||
+                          updateStatus === "ready"
+                        ) {
+                          void installUpdate();
+                        } else if (
+                          updateStatus !== "checking" &&
+                          updateStatus !== "downloading"
+                        ) {
+                          void checkForUpdates();
+                        }
+                      }}
+                      // relative: popLayout positions the outgoing status against this row, not the scrolled page.
+                      className="relative flex min-h-[54px] cursor-pointer items-center justify-between gap-3 text-left"
+                    >
+                      <span className="text-[15px] font-medium">Updates</span>
+                      <AnimatePresence mode="popLayout" initial={false}>
+                        <motion.span
+                          key={updateStatus}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -8 }}
+                          transition={SPRING}
+                          className={cn(
+                            "flex items-center gap-1.5 text-sm font-semibold",
+                            updateStatus === "available" ||
+                              updateStatus === "downloading" ||
+                              updateStatus === "ready"
+                              ? "text-pink"
+                              : updateStatus === "latest"
+                                ? "text-muted-foreground"
+                                : "text-highlight",
+                          )}
+                        >
+                          {updateStatus === "checking" && (
+                            <>
+                              <Loader2 className="size-4 animate-spin" />
+                              Checking…
+                            </>
+                          )}
+                          {updateStatus === "latest" && (
+                            <>
+                              <Check className="size-4 stroke-[2.5]" />
+                              Up to date
+                            </>
+                          )}
+                          {updateStatus === "available" && (
+                            <>v{updateVersion} available</>
+                          )}
+                          {updateStatus === "downloading" && (
+                            <span className="tabular-nums">
+                              Downloading {Math.round(downloadProgress * 100)}%
+                            </span>
+                          )}
+                          {updateStatus === "ready" && (
+                            <>v{updateVersion} ready</>
+                          )}
+                          {updateStatus === "error" && (
+                            <>Couldn’t check · retry</>
+                          )}
+                          {updateStatus === "idle" && <>Check now</>}
+                        </motion.span>
+                      </AnimatePresence>
+                    </button>
+                  ) : isIOS && !isInstalledWebApp ? (
+                    // iOS has no install prompt a web app can trigger, so explain the Share-sheet route.
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptic.tap();
+                        setShowInstallHelp(true);
+                      }}
+                      className="flex min-h-[54px] cursor-pointer items-center justify-between gap-3 text-left"
+                    >
+                      <span className="text-[15px] font-medium">
+                        Add to Home Screen
+                      </span>
+                      <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                        How
+                        <ChevronRight className="size-4" />
+                      </span>
+                    </button>
+                  ) : null}
+
+                  {isNativeApp && (
+                    <SettingRow id="auto-update" title="Auto-update">
+                      <Switch
+                        id="auto-update"
+                        checked={autoUpdate}
+                        onCheckedChange={setAutoUpdate}
+                      />
+                    </SettingRow>
+                  )}
+                </div>
+
+                <AnimatePresence initial={false}>
+                  {isNativeApp &&
+                    (updateStatus === "available" ||
+                      updateStatus === "downloading" ||
+                      updateStatus === "ready") && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={SPRING}
+                        className="overflow-hidden"
+                      >
+                        <button
+                          type="button"
+                          onClick={installUpdate}
+                          disabled={updateStatus === "downloading"}
+                          className="relative mt-1 flex h-[52px] w-full cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-full bg-primary font-display text-[15px] font-extrabold text-primary-foreground transition-[scale] active:scale-[0.98] disabled:cursor-default"
+                        >
+                          {updateStatus === "downloading" && (
+                            <motion.span
+                              className="absolute inset-y-0 left-0 bg-primary-foreground/15"
+                              animate={{
+                                width: `${Math.round(downloadProgress * 100)}%`,
+                              }}
+                              transition={{ duration: 0.2 }}
+                            />
+                          )}
+                          <span className="relative flex items-center gap-2 tabular-nums">
+                            {updateStatus === "downloading" ? (
+                              <>
+                                <Loader2 className="size-4 animate-spin" />
+                                downloading {Math.round(downloadProgress * 100)}
+                                %
+                              </>
+                            ) : updateStatus === "ready" ? (
+                              <>
+                                <Download className="size-4" />
+                                install v{updateVersion}
+                              </>
+                            ) : (
+                              <>
+                                <Download className="size-4" />
+                                download & install v{updateVersion}
+                              </>
+                            )}
                           </span>
-                        )}
-                        {updateStatus === "ready" && <>v{updateVersion} ready</>}
-                        {updateStatus === "error" && <>Couldn’t check · retry</>}
-                        {updateStatus === "idle" && <>Check now</>}
-                      </motion.span>
-                    </AnimatePresence>
-                  </button>
-                ) : isIOS && !isInstalledWebApp ? (
-                  // iOS has no install prompt a web app can trigger, so explain the Share-sheet route.
+                        </button>
+                      </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {!isNativeApp && !isIOS && (
+                  <a
+                    href={APK_DOWNLOAD_URL}
+                    className="mt-1 flex h-12 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-bold text-primary-foreground transition-[filter,scale] hover:brightness-105 active:scale-[0.98]"
+                  >
+                    <Download className="size-4" />
+                    download for android
+                  </a>
+                )}
+              </motion.section>
+
+              <motion.section variants={RISE} className="flex flex-col gap-2.5">
+                <span className="px-1 text-[13px] font-semibold text-muted-foreground">
+                  About
+                </span>
+                <div className="flex flex-col divide-y divide-border/70 rounded-[24px] bg-card px-[18px]">
+                  {[
+                    { label: "Made by", value: AUTHOR_NAME, href: AUTHOR_URL },
+                    {
+                      label: "Website",
+                      value: "tjeneritz.se",
+                      href: WEBSITE_URL,
+                    },
+                    {
+                      label: "Source code",
+                      value: "GitHub",
+                      href: githubRepoUrl,
+                    },
+                  ].map((link) => (
+                    <a
+                      key={link.label}
+                      href={link.href}
+                      target={externalLinkTarget}
+                      rel="noreferrer"
+                      className="flex min-h-[54px] items-center justify-between gap-3"
+                    >
+                      <span className="text-[15px] font-medium">
+                        {link.label}
+                      </span>
+                      <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        {link.value}
+                        <ExternalLink className="size-3.5" />
+                      </span>
+                    </a>
+                  ))}
                   <button
                     type="button"
                     onClick={() => {
                       haptic.tap();
-                      setShowInstallHelp(true);
+                      setShowLicense(true);
                     }}
                     className="flex min-h-[54px] cursor-pointer items-center justify-between gap-3 text-left"
                   >
-                    <span className="text-[15px] font-medium">Add to Home Screen</span>
+                    <span className="text-[15px] font-medium">License</span>
                     <span className="flex items-center gap-1 text-sm text-muted-foreground">
-                      How
+                      GPL-3.0
                       <ChevronRight className="size-4" />
                     </span>
                   </button>
-                ) : null}
+                </div>
+              </motion.section>
 
-                {isNativeApp && (
-                  <SettingRow id="auto-update" title="Auto-update">
-                    <Switch
-                      id="auto-update"
-                      checked={autoUpdate}
-                      onCheckedChange={setAutoUpdate}
-                    />
-                  </SettingRow>
-                )}
-              </div>
-
-              <AnimatePresence initial={false}>
-                {isNativeApp &&
-                  (updateStatus === "available" ||
-                    updateStatus === "downloading" ||
-                    updateStatus === "ready") && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={SPRING}
-                      className="overflow-hidden"
-                    >
-                      <button
-                        type="button"
-                        onClick={installUpdate}
-                        disabled={updateStatus === "downloading"}
-                        className="relative mt-1 flex h-[52px] w-full cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-full bg-primary font-display text-[15px] font-extrabold text-primary-foreground transition-[scale] active:scale-[0.98] disabled:cursor-default"
-                      >
-                        {updateStatus === "downloading" && (
-                          <motion.span
-                            className="absolute inset-y-0 left-0 bg-primary-foreground/15"
-                            animate={{ width: `${Math.round(downloadProgress * 100)}%` }}
-                            transition={{ duration: 0.2 }}
-                          />
-                        )}
-                        <span className="relative flex items-center gap-2 tabular-nums">
-                          {updateStatus === "downloading" ? (
-                            <>
-                              <Loader2 className="size-4 animate-spin" />
-                              downloading {Math.round(downloadProgress * 100)}%
-                            </>
-                          ) : updateStatus === "ready" ? (
-                            <>
-                              <Download className="size-4" />
-                              install v{updateVersion}
-                            </>
-                          ) : (
-                            <>
-                              <Download className="size-4" />
-                              download & install v{updateVersion}
-                            </>
-                          )}
-                        </span>
-                      </button>
-                    </motion.div>
-                  )}
-              </AnimatePresence>
-
-              {!isNativeApp && !isIOS && (
-                <a
-                  href={APK_DOWNLOAD_URL}
-                  className="mt-1 flex h-12 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-bold text-primary-foreground transition-[filter,scale] hover:brightness-105 active:scale-[0.98]"
-                >
-                  <Download className="size-4" />
-                  download for android
-                </a>
-              )}
-            </motion.section>
-
-            <motion.section variants={RISE} className="flex flex-col gap-2.5">
-              <span className="px-1 text-[13px] font-semibold text-muted-foreground">
-                About
-              </span>
-              <div className="flex flex-col divide-y divide-border/70 rounded-[24px] bg-card px-[18px]">
-                {[
-                  { label: "Made by", value: AUTHOR_NAME, href: AUTHOR_URL },
-                  { label: "Website", value: "tjeneritz.se", href: WEBSITE_URL },
-                  { label: "Source code", value: "GitHub", href: githubRepoUrl },
-                ].map((link) => (
-                  <a
-                    key={link.label}
-                    href={link.href}
-                    target={externalLinkTarget}
-                    rel="noreferrer"
-                    className="flex min-h-[54px] items-center justify-between gap-3"
-                  >
-                    <span className="text-[15px] font-medium">{link.label}</span>
-                    <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                      {link.value}
-                      <ExternalLink className="size-3.5" />
-                    </span>
-                  </a>
-                ))}
-                <button
-                  type="button"
+              <motion.div variants={RISE} className="flex justify-center pb-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-[13px]"
                   onClick={() => {
-                    haptic.tap();
-                    setShowLicense(true);
+                    haptic.press();
+                    resetSettings();
                   }}
-                  className="flex min-h-[54px] cursor-pointer items-center justify-between gap-3 text-left"
                 >
-                  <span className="text-[15px] font-medium">License</span>
-                  <span className="flex items-center gap-1 text-sm text-muted-foreground">
-                    GPL-3.0
-                    <ChevronRight className="size-4" />
-                  </span>
-                </button>
-              </div>
-            </motion.section>
-
-            <motion.div variants={RISE} className="flex justify-center pb-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-[13px]"
-                onClick={() => {
-                  haptic.press();
-                  resetSettings();
-                }}
-              >
-                <RotateCcw className="size-3.5" />
-                Reset game settings
-              </Button>
+                  <RotateCcw className="size-3.5" />
+                  Reset game settings
+                </Button>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        </Page>
+          </Page>
 
-        <ConfirmDialog
-          open={showEndConfirm}
-          predictive={backTarget === "confirm"}
-          icon={<VenetianMask className="size-7" aria-hidden />}
-          title="end this round?"
-          confirmLabel="end round"
-          cancelLabel="keep playing"
-          onConfirm={confirmEndGame}
-          onCancel={() => setShowEndConfirm(false)}
-        />
+          <ConfirmDialog
+            open={showEndConfirm}
+            predictive={backTarget === "confirm"}
+            icon={<VenetianMask className="size-7" aria-hidden />}
+            title="end this round?"
+            confirmLabel="end round"
+            cancelLabel="keep playing"
+            onConfirm={confirmEndGame}
+            onCancel={() => setShowEndConfirm(false)}
+          />
 
-        {/* iPhone: how to install from Safari */}
-        <Sheet
-          open={showInstallHelp}
-          onClose={() => setShowInstallHelp(false)}
-          labelledBy="install-help-title"
-          className="gap-5"
-          header={
-            <div className="flex h-11 items-center justify-between">
-              <h2
-                id="install-help-title"
-                className="font-display text-[22px] font-extrabold tracking-[-0.02em]"
-              >
-                add to home screen
-              </h2>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="-mr-2.5"
-                onClick={() => setShowInstallHelp(false)}
-                aria-label="Close"
-              >
-                <X className="size-5 stroke-[2.2]" />
-              </Button>
-            </div>
-          }
-        >
-          <motion.ol
-            variants={STAGGER}
-            initial="initial"
-            animate="animate"
-            className="flex flex-col gap-3 pb-2"
-          >
-            {[
-              { icon: Share, text: "Tap Share in Safari’s toolbar." },
-              { icon: SquarePlus, text: "Scroll down and tap Add to Home Screen." },
-              { icon: Check, text: "Tap Add. Imposter opens full screen from your home screen." },
-            ].map((step, index) => (
-              <motion.li
-                key={step.text}
-                variants={RISE}
-                className="flex items-center gap-4 rounded-[20px] bg-secondary py-3.5 pr-4 pl-3.5"
-              >
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-card text-pink">
-                  <step.icon className="size-5" />
-                </span>
-                <span className="text-[15px] leading-snug">
-                  <span className="mr-1.5 font-display font-extrabold text-pink">
-                    {index + 1}
-                  </span>
-                  {step.text}
-                </span>
-              </motion.li>
-            ))}
-          </motion.ol>
-        </Sheet>
-
-        {/* License, readable in-app */}
-        <Page
-          open={showLicense}
-          predictive={backTarget === "license"}
-          onClose={() => setShowLicense(false)}
-          title="license"
-          stacked
-        >
-          <div className="flex flex-col gap-4 pb-4 text-[14px] leading-relaxed text-muted-foreground">
-            {LICENSE_PARAGRAPHS.map((paragraph, index) => {
-              // Short lines are the license's own headings ("TERMS AND CONDITIONS", "0. Definitions.").
-              const isHeading = paragraph.length < 60 && !paragraph.endsWith(",");
-              return isHeading ? (
+          {/* iPhone: how to install from Safari */}
+          <Sheet
+            open={showInstallHelp}
+            onClose={() => setShowInstallHelp(false)}
+            labelledBy="install-help-title"
+            className="gap-5"
+            header={
+              <div className="flex h-11 items-center justify-between">
                 <h2
-                  key={index}
-                  className={cn(
-                    "font-semibold text-foreground",
-                    index === 0 && "font-display text-lg font-extrabold leading-snug",
-                  )}
+                  id="install-help-title"
+                  className="font-display text-[22px] font-extrabold tracking-[-0.02em]"
                 >
-                  {paragraph}
+                  add to home screen
                 </h2>
-              ) : (
-                <p key={index}>{paragraph}</p>
-              );
-            })}
-          </div>
-        </Page>
-      </div>
-    </MotionConfig>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="-mr-2.5"
+                  onClick={() => setShowInstallHelp(false)}
+                  aria-label="Close"
+                >
+                  <X className="size-5 stroke-[2.2]" />
+                </Button>
+              </div>
+            }
+          >
+            <motion.ol
+              variants={STAGGER}
+              initial="initial"
+              animate="animate"
+              className="flex flex-col gap-3 pb-2"
+            >
+              {[
+                { icon: Share, text: "Tap Share in Safari’s toolbar." },
+                {
+                  icon: SquarePlus,
+                  text: "Scroll down and tap Add to Home Screen.",
+                },
+                {
+                  icon: Check,
+                  text: "Tap Add. Imposter opens full screen from your home screen.",
+                },
+              ].map((step, index) => (
+                <motion.li
+                  key={step.text}
+                  variants={RISE}
+                  className="flex items-center gap-4 rounded-[20px] bg-secondary py-3.5 pr-4 pl-3.5"
+                >
+                  <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-card text-pink">
+                    <step.icon className="size-5" />
+                  </span>
+                  <span className="text-[15px] leading-snug">
+                    <span className="mr-1.5 font-display font-extrabold text-pink">
+                      {index + 1}
+                    </span>
+                    {step.text}
+                  </span>
+                </motion.li>
+              ))}
+            </motion.ol>
+          </Sheet>
+
+          {/* License, readable in-app */}
+          <Page
+            open={showLicense}
+            predictive={backTarget === "license"}
+            onClose={() => setShowLicense(false)}
+            title="license"
+            stacked
+          >
+            <div className="flex flex-col gap-4 pb-4 text-[14px] leading-relaxed text-muted-foreground">
+              {LICENSE_PARAGRAPHS.map((paragraph, index) => {
+                // Short lines are the license's own headings ("TERMS AND CONDITIONS", "0. Definitions.").
+                const isHeading =
+                  paragraph.length < 60 && !paragraph.endsWith(",");
+                return isHeading ? (
+                  <h2
+                    key={index}
+                    className={cn(
+                      "font-semibold text-foreground",
+                      index === 0 &&
+                        "font-display text-lg font-extrabold leading-snug",
+                    )}
+                  >
+                    {paragraph}
+                  </h2>
+                ) : (
+                  <p key={index}>{paragraph}</p>
+                );
+              })}
+            </div>
+          </Page>
+        </div>
+      </MotionConfig>
     </PredictiveBackContext.Provider>
   );
 }
