@@ -1,9 +1,11 @@
 name: Android release
 
 # Push a tag like v1.2.0 (matching package.json) to build a signed APK and publish it as a release.
+# Running it by hand (workflow_dispatch) builds the APK as a check, without publishing anything.
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -12,13 +14,14 @@ jobs:
   release-apk:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: oven-sh/setup-bun@v2
 
       - run: bun install --frozen-lockfile
 
       - name: Check tag matches package.json version
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           VERSION=$(node -p "require('./package.json').version")
           if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
@@ -28,13 +31,13 @@ jobs:
 
       - run: bun run build
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
 
       # The default package list includes the long-removed "tools" package, which fails to install.
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
         with:
           packages: platform-tools
 
@@ -55,7 +58,8 @@ jobs:
       # A fixed file name keeps releases/latest/download/imposter.apk working for every release.
       - run: cp android/app/build/outputs/apk/release/app-release.apk imposter.apk
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           files: imposter.apk
           generate_release_notes: true
