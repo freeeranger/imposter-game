@@ -15,7 +15,8 @@ export default defineConfig({
     // registered from src/main.tsx on the web only; the Android app bundles its own files.
     VitePWA({
       injectRegister: false,
-      registerType: "autoUpdate",
+      // "prompt" so a new deploy never reloads the page mid-round; src/lib/pwa.ts decides when.
+      registerType: "prompt",
       includeAssets: ["favicon.svg", "apple-touch-icon.png"],
       manifest: {
         name: "Imposter",

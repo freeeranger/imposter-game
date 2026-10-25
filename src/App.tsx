@@ -71,6 +71,7 @@ import {
   setSystemBarsTheme,
 } from "@/lib/native";
 import { PredictiveBackContext } from "@/lib/predictive-back";
+import { applyPendingWebUpdate } from "@/lib/pwa";
 import { cn } from "@/lib/utils";
 
 type CategoryTag = "new" | "updated";
@@ -1085,6 +1086,49 @@ function App() {
       }
     };
   });
+
+  // Web: browser/system back (Android home-screen app, iPhone edge swipe) should close layers
+  // too, not leave the page. While there is something to go back from, one extra history
+  // entry catches the back press.
+  const [webBackPresses, setWebBackPresses] = useState(0);
+  const skipNextPopState = useRef(false);
+  useEffect(() => {
+    if (isNativeApp) return;
+    const handlePopState = () => {
+      if (skipNextPopState.current) {
+        skipNextPopState.current = false;
+        return;
+      }
+      handleBackRef.current();
+      setWebBackPresses((count) => count + 1);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+  useEffect(() => {
+    if (isNativeApp) return;
+    const hasBackEntry = window.history.state?.imposterBack === true;
+    if (canGoBack && !hasBackEntry) {
+      window.history.pushState({ imposterBack: true }, "");
+    } else if (!canGoBack && hasBackEntry) {
+      // Closed some other way: drop the spare entry so back leaves the page as usual.
+      skipNextPopState.current = true;
+      window.history.back();
+    }
+  }, [canGoBack, webBackPresses]);
+
+  // Web: take a downloaded update while the app sits in the background on the setup screen,
+  // where reloading loses nothing (settings and categories are saved).
+  const isIdleForUpdate = gameState === "setup" && !isEditorOpen;
+  useEffect(() => {
+    if (isNativeApp || !isIdleForUpdate) return;
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") applyPendingWebUpdate();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [isIdleForUpdate]);
 
   // Predictive back: the layer being closed follows the swipe until it commits or cancels.
   const backProgress = useMotionValue(0);
