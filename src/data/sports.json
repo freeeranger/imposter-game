@@ -53,16 +53,11 @@
     "Padel",
     "Lacrosse",
     "Triathlon",
-    "Long Jump",
     "Bandy",
     "Biathlon",
     "Cross-Country Skiing",
     "Figure Skating",
     "Bobsleigh",
-    "Pole Vault",
-    "High Jump",
-    "Javelin",
-    "Marathon",
     "Diving",
     "Kayaking",
     "Kitesurfing",
@@ -73,6 +68,11 @@
     "Show Jumping",
     "Orienteering",
     "Pickleball",
-    "Parkour"
+    "Parkour",
+    "Ultimate Frisbee",
+    "Disc Golf",
+    "Polo",
+    "Roller Derby",
+    "Hurling"
   ]
 }
