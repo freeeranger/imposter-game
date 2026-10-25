@@ -15,6 +15,16 @@ import { FileOpener } from "@capacitor-community/file-opener";
 // Native-only features. Every helper is a safe no-op in the browser.
 export const isNativeApp = Capacitor.isNativePlatform();
 
+// iPadOS reports itself as a Mac, so also check for touch.
+export const isIOS =
+  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+
+// True when opened from the home screen (installed web app) rather than in a browser tab.
+export const isInstalledWebApp =
+  window.matchMedia("(display-mode: standalone)").matches ||
+  (navigator as Navigator & { standalone?: boolean }).standalone === true;
+
 const runNative = (action: () => Promise<unknown>) => {
   if (!isNativeApp) return;
   action().catch(() => {
@@ -79,8 +89,41 @@ export const hideSplashScreen = (onReveal: () => void) => {
   });
 };
 
-export const setKeepAwake = (keepAwake: boolean) =>
-  runNative(() => (keepAwake ? KeepAwake.keepAwake() : KeepAwake.allowSleep()));
+// On the web the Screen Wake Lock API does the same job; the browser drops the lock whenever
+// the page is hidden, so it is re-requested when the page comes back.
+let webWakeLock: WakeLockSentinel | null = null;
+let wantsWebWakeLock = false;
+
+const requestWebWakeLock = async () => {
+  try {
+    webWakeLock = await navigator.wakeLock.request("screen");
+  } catch {
+    // Not allowed right now (e.g. low battery mode); the round still works without it.
+  }
+};
+
+if (!isNativeApp && "wakeLock" in navigator) {
+  document.addEventListener("visibilitychange", () => {
+    if (wantsWebWakeLock && document.visibilityState === "visible") {
+      void requestWebWakeLock();
+    }
+  });
+}
+
+export const setKeepAwake = (keepAwake: boolean) => {
+  if (isNativeApp) {
+    runNative(() => (keepAwake ? KeepAwake.keepAwake() : KeepAwake.allowSleep()));
+    return;
+  }
+  if (!("wakeLock" in navigator)) return;
+  wantsWebWakeLock = keepAwake;
+  if (keepAwake && (!webWakeLock || webWakeLock.released)) {
+    void requestWebWakeLock();
+  } else if (!keepAwake) {
+    void webWakeLock?.release();
+    webWakeLock = null;
+  }
+};
 
 export const setSystemBarsTheme = (theme: "light" | "dark") =>
   runNative(() =>

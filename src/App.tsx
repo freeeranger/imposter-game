@@ -33,6 +33,8 @@ import {
   Info,
   Moon,
   Settings,
+  Share,
+  SquarePlus,
   Music,
   RotateCcw,
   Shuffle,
@@ -47,6 +49,8 @@ import {
   fetchLatestVersion,
   hideSplashScreen,
   haptic,
+  isIOS,
+  isInstalledWebApp,
   isNativeApp,
   isNewerVersion,
   onPredictiveBack,
@@ -598,6 +602,7 @@ function App() {
     },
   );
   const [showEndConfirm, setShowEndConfirm] = useState<boolean>(false);
+  const [showInstallHelp, setShowInstallHelp] = useState<boolean>(false);
   const autoDownloadStarted = useRef(false);
   const autoInstallPending = useRef(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
@@ -798,7 +803,8 @@ function App() {
       !showCategorySheet &&
       !showSettings &&
       !isNumberPickerOpen &&
-      !showEndConfirm
+      !showEndConfirm &&
+      !showInstallHelp
     ) {
       return;
     }
@@ -807,6 +813,10 @@ function App() {
       if (event.key === "Escape") {
         if (showEndConfirm) {
           setShowEndConfirm(false);
+          return;
+        }
+        if (showInstallHelp) {
+          setShowInstallHelp(false);
           return;
         }
         setShowInfoModal(false);
@@ -829,6 +839,7 @@ function App() {
     isNumberPickerOpen,
     showLicense,
     showEndConfirm,
+    showInstallHelp,
   ]);
 
   useEffect(() => {
@@ -2388,6 +2399,22 @@ function App() {
                       </motion.span>
                     </AnimatePresence>
                   </button>
+                ) : isIOS && !isInstalledWebApp ? (
+                  // iOS has no install prompt a web app can trigger, so explain the Share-sheet route.
+                  <button
+                    type="button"
+                    onClick={() => {
+                      haptic.tap();
+                      setShowInstallHelp(true);
+                    }}
+                    className="flex min-h-[54px] cursor-pointer items-center justify-between gap-3 text-left"
+                  >
+                    <span className="text-[15px] font-medium">Add to Home Screen</span>
+                    <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                      How
+                      <ChevronRight className="size-4" />
+                    </span>
+                  </button>
                 ) : null}
 
                 {isNativeApp && (
@@ -2449,7 +2476,7 @@ function App() {
                   )}
               </AnimatePresence>
 
-              {!isNativeApp && (
+              {!isNativeApp && !isIOS && (
                 <a
                   href={APK_DOWNLOAD_URL}
                   className="mt-1 flex h-12 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-bold text-primary-foreground transition-[filter,scale] hover:brightness-105 active:scale-[0.98]"
@@ -2528,6 +2555,62 @@ function App() {
           onConfirm={confirmEndGame}
           onCancel={() => setShowEndConfirm(false)}
         />
+
+        {/* iPhone: how to install from Safari */}
+        <Sheet
+          open={showInstallHelp}
+          onClose={() => setShowInstallHelp(false)}
+          labelledBy="install-help-title"
+          className="gap-5"
+          header={
+            <div className="flex h-11 items-center justify-between">
+              <h2
+                id="install-help-title"
+                className="font-display text-[22px] font-extrabold tracking-[-0.02em]"
+              >
+                add to home screen
+              </h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="-mr-2.5"
+                onClick={() => setShowInstallHelp(false)}
+                aria-label="Close"
+              >
+                <X className="size-5 stroke-[2.2]" />
+              </Button>
+            </div>
+          }
+        >
+          <motion.ol
+            variants={STAGGER}
+            initial="initial"
+            animate="animate"
+            className="flex flex-col gap-3 pb-2"
+          >
+            {[
+              { icon: Share, text: "Tap Share in Safari’s toolbar." },
+              { icon: SquarePlus, text: "Scroll down and tap Add to Home Screen." },
+              { icon: Check, text: "Tap Add. Imposter opens full screen from your home screen." },
+            ].map((step, index) => (
+              <motion.li
+                key={step.text}
+                variants={RISE}
+                className="flex items-center gap-4 rounded-[20px] bg-secondary py-3.5 pr-4 pl-3.5"
+              >
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-card text-pink">
+                  <step.icon className="size-5" />
+                </span>
+                <span className="text-[15px] leading-snug">
+                  <span className="mr-1.5 font-display font-extrabold text-pink">
+                    {index + 1}
+                  </span>
+                  {step.text}
+                </span>
+              </motion.li>
+            ))}
+          </motion.ol>
+        </Sheet>
 
         {/* License, readable in-app */}
         <Page

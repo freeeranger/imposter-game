@@ -2,6 +2,13 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.tsx";
+import { registerSW } from "virtual:pwa-register";
+import { isNativeApp } from "@/lib/native";
+
+// Web only: offline support + silent updates (a new deploy is picked up on the next launch).
+if (!isNativeApp) {
+  registerSW({ immediate: true });
+}
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
