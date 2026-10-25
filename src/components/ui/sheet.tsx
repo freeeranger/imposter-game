@@ -1,7 +1,14 @@
 import type { ReactNode } from "react";
-import { AnimatePresence, motion, useDragControls } from "motion/react";
+import {
+  AnimatePresence,
+  motion,
+  useDragControls,
+  useMotionValue,
+  useTransform,
+} from "motion/react";
 
 import { haptic } from "@/lib/native";
+import { usePredictiveBack } from "@/lib/predictive-back";
 import { cn } from "@/lib/utils";
 
 type SheetProps = {
@@ -12,6 +19,8 @@ type SheetProps = {
   header: ReactNode;
   children: ReactNode;
   className?: string;
+  // Follow Android's predictive back swipe (only the top-most layer should).
+  predictive?: boolean;
 };
 
 const DISMISS_OFFSET = 110;
@@ -25,8 +34,15 @@ function Sheet({
   header,
   children,
   className,
+  predictive = false,
 }: SheetProps) {
   const dragControls = useDragControls();
+  const back = usePredictiveBack();
+  const idleProgress = useMotionValue(0);
+  const progress = back?.progress ?? idleProgress;
+  // Preview of the sheet closing: it sinks and shrinks slightly with the swipe.
+  const previewY = useTransform(progress, [0, 1], [0, 72]);
+  const previewScale = useTransform(progress, [0, 1], [1, 0.96]);
 
   return (
     <AnimatePresence>
@@ -40,6 +56,10 @@ function Sheet({
             className="fixed inset-0 bg-overlay"
             onClick={onClose}
           />
+          <motion.div
+            style={predictive ? { y: previewY, scale: previewScale } : undefined}
+            className="relative z-10 flex w-full max-w-md origin-bottom justify-center"
+          >
           <motion.div
             role="dialog"
             aria-modal="true"
@@ -83,6 +103,7 @@ function Sheet({
               {header}
             </div>
             {children}
+          </motion.div>
           </motion.div>
         </div>
       )}

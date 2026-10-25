@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import {
   AnimatePresence,
   MotionConfig,
+  animate,
   motion,
   useMotionValue,
   useTransform,
@@ -41,7 +42,6 @@ import {
 } from "lucide-react";
 import {
   APK_DOWNLOAD_URL,
-  exitApp,
   externalLinkTarget,
   downloadUpdate,
   fetchLatestVersion,
@@ -49,12 +49,14 @@ import {
   haptic,
   isNativeApp,
   isNewerVersion,
-  onBackButton,
+  onPredictiveBack,
   openUpdateInstaller,
+  setBackInterception,
   setHapticsEnabled,
   setKeepAwake,
   setSystemBarsTheme,
 } from "@/lib/native";
+import { PredictiveBackContext } from "@/lib/predictive-back";
 import { cn } from "@/lib/utils";
 
 type CategoryTag = "new" | "updated";
@@ -289,7 +291,10 @@ const AUTO_UPDATE_STORAGE_KEY = "imposter-game-auto-update";
 const SYSTEM_DARK_QUERY = "(prefers-color-scheme: dark)";
 
 type NumberPickerKind = "players" | "imposters" | "prank";
-const PRANK_PRESETS = [0, 5, 10, 25, 50, 100];
+const PRANK_PRESETS = [0, 5, 10, 15, 20, 25];
+
+// Layers that close on Android back, top-most first.
+type BackLayer = "confirm" | "picker" | "license" | "settings" | "category" | "info";
 
 type UpdateStatus =
   | "idle"
@@ -690,40 +695,88 @@ function App() {
     setKeepAwake(gameState !== "setup");
   }, [gameState]);
 
-  // Android back button: close what's open, step out of a round, then leave the app.
+  // Android back: close the top-most layer, or step out of a round. With nothing to close,
+  // back isn't intercepted at all, so Android plays its own predictive back-to-home.
+  const topLayer: BackLayer | null = showEndConfirm
+    ? "confirm"
+    : isNumberPickerOpen
+      ? "picker"
+      : showLicense
+        ? "license"
+        : showSettings
+          ? "settings"
+          : showCategorySheet
+            ? "category"
+            : showInfoModal
+              ? "info"
+              : null;
+  const canGoBack = topLayer !== null || gameState !== "setup";
+
+  useEffect(() => {
+    setBackInterception(canGoBack);
+  }, [canGoBack]);
+
+  // Kept in refs so the native listeners (registered once) always see the latest state.
+  const topLayerRef = useRef<BackLayer | null>(topLayer);
+  const handleBackRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    topLayerRef.current = topLayer;
+    handleBackRef.current = () => {
+      if (showEndConfirm) {
+        setShowEndConfirm(false);
+      } else if (isNumberPickerOpen) {
+        setIsNumberPickerOpen(false);
+      } else if (showLicense) {
+        setShowLicense(false);
+      } else if (showSettings) {
+        setShowSettings(false);
+      } else if (showCategorySheet) {
+        setShowCategorySheet(false);
+      } else if (showInfoModal) {
+        setShowInfoModal(false);
+      } else if (gameState === "pass" || gameState === "reveal") {
+        haptic.tap();
+        setShowEndConfirm(true);
+      } else if (gameState === "end") {
+        setGameState("setup");
+      }
+    };
+  });
+
+  // Predictive back: the layer being closed follows the swipe until it commits or cancels.
+  const backProgress = useMotionValue(0);
+  const backEdge = useMotionValue(1);
+  const [predictiveBackValues] = useState(() => ({
+    progress: backProgress,
+    edge: backEdge,
+  }));
+  const [backTarget, setBackTarget] = useState<BackLayer | null>(null);
+
   useEffect(
     () =>
-      onBackButton(() => {
-        if (showEndConfirm) {
-          setShowEndConfirm(false);
-        } else if (isNumberPickerOpen) {
-          setIsNumberPickerOpen(false);
-        } else if (showLicense) {
-          setShowLicense(false);
-        } else if (showSettings) {
-          setShowSettings(false);
-        } else if (showCategorySheet) {
-          setShowCategorySheet(false);
-        } else if (showInfoModal) {
-          setShowInfoModal(false);
-        } else if (gameState === "pass" || gameState === "reveal") {
-          haptic.tap();
-          setShowEndConfirm(true);
-        } else if (gameState === "end") {
-          setGameState("setup");
-        } else {
-          exitApp();
-        }
+      onPredictiveBack({
+        onProgress: (progress, edge) => {
+          setBackTarget((current) => current ?? topLayerRef.current);
+          backEdge.set(edge === "left" ? 1 : -1);
+          backProgress.set(progress);
+        },
+        onCancel: () => {
+          void animate(backProgress, 0, {
+            type: "spring",
+            stiffness: 500,
+            damping: 40,
+          }).then(() => setBackTarget(null));
+        },
+        onInvoke: () => {
+          handleBackRef.current();
+          // Let the closing layer finish its exit before the preview resets.
+          window.setTimeout(() => {
+            backProgress.set(0);
+            setBackTarget(null);
+          }, 320);
+        },
       }),
-    [
-      showEndConfirm,
-      isNumberPickerOpen,
-      showLicense,
-      showSettings,
-      showCategorySheet,
-      showInfoModal,
-      gameState,
-    ],
+    [backProgress, backEdge],
   );
 
   useEffect(() => {
@@ -1116,6 +1169,7 @@ function App() {
   const canRevealFellows = impostersCount >= 2;
 
   return (
+    <PredictiveBackContext.Provider value={predictiveBackValues}>
     <MotionConfig reducedMotion="user">
       <div className="relative flex h-dvh w-full justify-center overflow-hidden bg-background text-foreground transition-colors select-none">
         <div className="flex h-full w-full max-w-md flex-col px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] pl-[max(1.25rem,env(safe-area-inset-left))] pr-[max(1.25rem,env(safe-area-inset-right))]">
@@ -1633,6 +1687,7 @@ function App() {
         {/* Category picker */}
         <Sheet
           open={showCategorySheet}
+          predictive={backTarget === "category"}
           onClose={() => setShowCategorySheet(false)}
           labelledBy="category-sheet-title"
           header={
@@ -1893,6 +1948,7 @@ function App() {
         {/* How to play */}
         <Sheet
           open={showInfoModal}
+          predictive={backTarget === "info"}
           onClose={() => setShowInfoModal(false)}
           labelledBy="info-sheet-title"
           className="gap-5"
@@ -1942,6 +1998,7 @@ function App() {
         {/* Number picker: tap a number instead of typing one */}
         <Sheet
           open={isNumberPickerOpen}
+          predictive={backTarget === "picker"}
           onClose={() => setIsNumberPickerOpen(false)}
           labelledBy="number-picker-title"
           header={
@@ -2101,6 +2158,7 @@ function App() {
         {/* Settings */}
         <Page
           open={showSettings}
+          predictive={backTarget === "settings"}
           onClose={() => setShowSettings(false)}
           title="settings"
         >
@@ -2244,14 +2302,7 @@ function App() {
                       </motion.span>
                     </AnimatePresence>
                   </button>
-                ) : (
-                  <div className="flex min-h-[54px] items-center justify-between gap-3">
-                    <span className="text-[15px] font-medium">Updates</span>
-                    <span className="text-sm text-muted-foreground">
-                      Always latest on the web
-                    </span>
-                  </div>
-                )}
+                ) : null}
 
                 {isNativeApp && (
                   <SettingRow id="auto-update" title="Auto-update">
@@ -2315,15 +2366,10 @@ function App() {
               {!isNativeApp && (
                 <a
                   href={APK_DOWNLOAD_URL}
-                  className="mt-1 flex h-12 items-center justify-between rounded-full bg-primary px-5 text-sm font-bold text-primary-foreground transition-[filter,scale] hover:brightness-105 active:scale-[0.98]"
+                  className="mt-1 flex h-12 items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-bold text-primary-foreground transition-[filter,scale] hover:brightness-105 active:scale-[0.98]"
                 >
-                  <span className="flex items-center gap-2">
-                    <Download className="size-4" />
-                    download for android
-                  </span>
-                  <span className="text-xs font-semibold opacity-70">
-                    apk · v{APP_VERSION}
-                  </span>
+                  <Download className="size-4" />
+                  download for android
                 </a>
               )}
             </motion.section>
@@ -2388,6 +2434,7 @@ function App() {
 
         <ConfirmDialog
           open={showEndConfirm}
+          predictive={backTarget === "confirm"}
           icon={<VenetianMask className="size-7" aria-hidden />}
           title="end this round?"
           confirmLabel="end round"
@@ -2399,6 +2446,7 @@ function App() {
         {/* License, readable in-app */}
         <Page
           open={showLicense}
+          predictive={backTarget === "license"}
           onClose={() => setShowLicense(false)}
           title="license"
           stacked
@@ -2425,6 +2473,7 @@ function App() {
         </Page>
       </div>
     </MotionConfig>
+    </PredictiveBackContext.Provider>
   );
 }
 

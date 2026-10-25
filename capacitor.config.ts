@@ -7,6 +7,10 @@ const config: CapacitorConfig = {
   // Matches the dark theme so the app never flashes white while loading.
   backgroundColor: "#15111f",
   plugins: {
+    // Back is handled by our PredictiveBack plugin (it supports the predictive back gesture).
+    App: {
+      disableBackButtonHandler: true,
+    },
     // Held until the app has rendered (see hideSplashScreen), then faded out.
     SplashScreen: {
       launchAutoHide: false,

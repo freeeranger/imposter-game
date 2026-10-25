@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useMotionValue, useTransform } from "motion/react";
 
 import { Button } from "@/components/ui/button";
+import { usePredictiveBack } from "@/lib/predictive-back";
 
 type ConfirmDialogProps = {
   open: boolean;
@@ -12,6 +13,8 @@ type ConfirmDialogProps = {
   cancelLabel: string;
   onConfirm: () => void;
   onCancel: () => void;
+  // Follow Android's predictive back swipe (only the top-most layer should).
+  predictive?: boolean;
 };
 
 // Our own confirm prompt, replacing the browser/Android system dialog.
@@ -24,7 +27,14 @@ function ConfirmDialog({
   cancelLabel,
   onConfirm,
   onCancel,
+  predictive = false,
 }: ConfirmDialogProps) {
+  const back = usePredictiveBack();
+  const idleProgress = useMotionValue(0);
+  const progress = back?.progress ?? idleProgress;
+  const previewScale = useTransform(progress, [0, 1], [1, 0.88]);
+  const previewOpacity = useTransform(progress, [0, 1], [1, 0.6]);
+
   return (
     <AnimatePresence>
       {open && (
@@ -37,6 +47,10 @@ function ConfirmDialog({
             className="fixed inset-0 bg-overlay"
             onClick={onCancel}
           />
+          <motion.div
+            style={predictive ? { scale: previewScale, opacity: previewOpacity } : undefined}
+            className="relative z-10 flex w-full max-w-xs justify-center"
+          >
           <motion.div
             role="alertdialog"
             aria-modal="true"
@@ -81,6 +95,7 @@ function ConfirmDialog({
                 {cancelLabel}
               </Button>
             </div>
+          </motion.div>
           </motion.div>
         </div>
       )}

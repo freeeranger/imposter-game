@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useMotionValue, useTransform } from "motion/react";
 import { ChevronLeft } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { haptic } from "@/lib/native";
+import { usePredictiveBack } from "@/lib/predictive-back";
 import { cn } from "@/lib/utils";
 
 type PageProps = {
@@ -13,13 +14,32 @@ type PageProps = {
   children: ReactNode;
   // Stacks above another open page (e.g. license on top of settings).
   stacked?: boolean;
+  // Follow Android's predictive back swipe (only the top-most layer should).
+  predictive?: boolean;
 };
 
 const DISMISS_OFFSET = 110;
 const DISMISS_VELOCITY = 600;
 
 // Full-screen page that slides in from the right; tap back or swipe right to leave.
-function Page({ open, onClose, title, children, stacked = false }: PageProps) {
+function Page({
+  open,
+  onClose,
+  title,
+  children,
+  stacked = false,
+  predictive = false,
+}: PageProps) {
+  const back = usePredictiveBack();
+  const idleProgress = useMotionValue(0);
+  const idleEdge = useMotionValue(1);
+  const progress = back?.progress ?? idleProgress;
+  const edge = back?.edge ?? idleEdge;
+  // Material-style preview: shrink, drift toward the swipe, round the corners.
+  const scale = useTransform(progress, [0, 1], [1, 0.9]);
+  const x = useTransform(() => progress.get() * edge.get() * 24);
+  const borderRadius = useTransform(progress, [0, 1], [0, 32]);
+
   return (
     <AnimatePresence>
       {open && (
@@ -46,31 +66,33 @@ function Page({ open, onClose, title, children, stacked = false }: PageProps) {
               onClose();
             }
           }}
-          className={cn(
-            "fixed inset-0 flex touch-pan-y justify-center bg-background text-foreground shadow-[-16px_0_40px_rgb(0_0_0/0.35)]",
-            stacked ? "z-50" : "z-40",
-          )}
+          className={cn("fixed inset-0 touch-pan-y", stacked ? "z-50" : "z-40")}
         >
-          <div className="flex h-full w-full max-w-md flex-col px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pr-[max(1.25rem,env(safe-area-inset-right))] pb-[max(1.25rem,env(safe-area-inset-bottom))] pl-[max(1.25rem,env(safe-area-inset-left))]">
-            <header className="flex h-11 shrink-0 items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="-ml-3"
-                onClick={onClose}
-                aria-label="Back"
-              >
-                <ChevronLeft className="size-6 stroke-[2.2]" />
-              </Button>
-              <h1 className="font-display text-[28px] leading-none font-extrabold tracking-[-0.03em]">
-                {title}
-              </h1>
-            </header>
-            {/* relative so popLayout animations inside measure against the scrolled content */}
-            <div className="relative -mx-5 min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-6 pb-2">
-              {children}
+          <motion.div
+            style={predictive ? { scale, x, borderRadius } : undefined}
+            className="absolute inset-0 flex justify-center overflow-hidden bg-background text-foreground shadow-[-16px_0_40px_rgb(0_0_0/0.35)]"
+          >
+            <div className="flex h-full w-full max-w-md flex-col px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pr-[max(1.25rem,env(safe-area-inset-right))] pb-[max(1.25rem,env(safe-area-inset-bottom))] pl-[max(1.25rem,env(safe-area-inset-left))]">
+              <header className="flex h-11 shrink-0 items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="-ml-3"
+                  onClick={onClose}
+                  aria-label="Back"
+                >
+                  <ChevronLeft className="size-6 stroke-[2.2]" />
+                </Button>
+                <h1 className="font-display text-[28px] leading-none font-extrabold tracking-[-0.03em]">
+                  {title}
+                </h1>
+              </header>
+              {/* relative so popLayout animations inside measure against the scrolled content */}
+              <div className="relative -mx-5 min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-6 pb-2">
+                {children}
+              </div>
             </div>
-          </div>
+          </motion.div>
         </motion.div>
       )}
     </AnimatePresence>

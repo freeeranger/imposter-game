@@ -1,5 +1,10 @@
-import { Capacitor, SystemBars, SystemBarsStyle } from "@capacitor/core";
-import { App } from "@capacitor/app";
+import {
+  Capacitor,
+  registerPlugin,
+  SystemBars,
+  SystemBarsStyle,
+} from "@capacitor/core";
+import type { PluginListenerHandle } from "@capacitor/core";
 import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
 import { KeepAwake } from "@capacitor-community/keep-awake";
 import { SplashScreen } from "@capacitor/splash-screen";
@@ -54,16 +59,46 @@ export const setSystemBarsTheme = (theme: "light" | "dark") =>
     }),
   );
 
+// Our native PredictiveBack plugin (android/app/.../PredictiveBackPlugin.java).
+type BackGestureEvent = { progress: number; edge: "left" | "right" };
+interface PredictiveBackPlugin {
+  setEnabled(options: { enabled: boolean }): Promise<void>;
+  addListener(
+    eventName: "backStarted" | "backProgressed",
+    listener: (event: BackGestureEvent) => void,
+  ): Promise<PluginListenerHandle>;
+  addListener(
+    eventName: "backCancelled" | "backInvoked",
+    listener: () => void,
+  ): Promise<PluginListenerHandle>;
+}
+const PredictiveBack = registerPlugin<PredictiveBackPlugin>("PredictiveBack");
+
+// Only intercept back while something in the app can close; otherwise Android plays its back-to-home preview.
+export const setBackInterception = (enabled: boolean) =>
+  runNative(() => PredictiveBack.setEnabled({ enabled }));
+
 // Returns an unsubscribe function, so it slots straight into a useEffect.
-export const onBackButton = (handler: () => void) => {
+export const onPredictiveBack = (handlers: {
+  onProgress: (progress: number, edge: "left" | "right") => void;
+  onCancel: () => void;
+  onInvoke: () => void;
+}) => {
   if (!isNativeApp) return () => {};
-  const listener = App.addListener("backButton", handler);
+  const listeners = [
+    PredictiveBack.addListener("backStarted", (event) =>
+      handlers.onProgress(event.progress, event.edge),
+    ),
+    PredictiveBack.addListener("backProgressed", (event) =>
+      handlers.onProgress(event.progress, event.edge),
+    ),
+    PredictiveBack.addListener("backCancelled", handlers.onCancel),
+    PredictiveBack.addListener("backInvoked", handlers.onInvoke),
+  ];
   return () => {
-    void listener.then((handle) => handle.remove());
+    listeners.forEach((listener) => void listener.then((handle) => handle.remove()));
   };
 };
-
-export const exitApp = () => runNative(() => App.exitApp());
 
 // In the app, a plain link hands external URLs to the system browser; a new tab would go nowhere.
 export const externalLinkTarget = isNativeApp ? undefined : "_blank";
