@@ -21,4 +21,6 @@ bunx cap sync android
 ```
 
 ## License
-The game is available under the GPL-v3.0 license.
+The game is available under the GPL-3.0 license.
+
+TLDR: you can use, modify, and share the software freely. And if you distribute it or anything derived from it you have to release the full source code under GPL-3.0 too.
