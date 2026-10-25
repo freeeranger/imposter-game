@@ -47,7 +47,7 @@ function NumberStepper({
   return (
     <div
       className={cn(
-        "flex items-center gap-1",
+        "flex items-center gap-1 max-[374px]:gap-0.5",
         size === "lg" ? "w-full justify-between" : "shrink-0",
       )}
     >
@@ -55,6 +55,7 @@ function NumberStepper({
         type="button"
         variant={size === "lg" ? "outline" : "ghost"}
         size="icon"
+        className={size === "lg" ? "max-[359px]:size-10" : undefined}
         onClick={() => updateValue(value - step)}
         disabled={value <= min}
         aria-label={`Fewer ${label}`}
@@ -79,7 +80,9 @@ function NumberStepper({
             ? cn(
                 // Fixed height so the row doesn't jump when two digits shrink the type.
                 "h-14 min-w-0 flex-1 items-center",
-                value >= 10 ? "text-[28px]" : "text-[50px]",
+                value >= 10
+                  ? "text-[28px] max-[359px]:text-[24px]"
+                  : "text-[50px]",
               )
             : "text-[17px]",
           valueClassName,
@@ -96,6 +99,7 @@ function NumberStepper({
         type="button"
         variant={size === "lg" ? "outline" : "ghost"}
         size="icon"
+        className={size === "lg" ? "max-[359px]:size-10" : undefined}
         onClick={() => updateValue(value + step)}
         disabled={value >= max}
         aria-label={`More ${label}`}

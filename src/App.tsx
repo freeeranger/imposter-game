@@ -1948,7 +1948,8 @@ function App() {
                       variants={RISE}
                       className="grid shrink-0 grid-cols-2 rounded-[24px] bg-card pt-4 pb-[18px]"
                     >
-                      <div className="flex flex-col items-center gap-2 border-r border-border/70 px-3.5">
+                      {/* Narrow phones: less side padding so two-digit counts fit between − and +. */}
+                      <div className="flex flex-col items-center gap-2 border-r border-border/70 px-3.5 max-[374px]:px-2">
                         <label
                           htmlFor="players"
                           className="text-[13px] font-semibold text-muted-foreground"
@@ -1965,7 +1966,7 @@ function App() {
                           onPick={() => openNumberPicker("players")}
                         />
                       </div>
-                      <div className="flex flex-col items-center gap-2 px-3.5">
+                      <div className="flex flex-col items-center gap-2 px-3.5 max-[374px]:px-2">
                         <label
                           htmlFor="imposters"
                           className="text-[13px] font-semibold text-muted-foreground"
@@ -2367,7 +2368,8 @@ function App() {
               <Button
                 onClick={primaryAction}
                 size="lg"
-                className="relative w-full overflow-hidden"
+                // Below 360px "hide & pass to player 20" needs smaller type to fit.
+                className="relative w-full overflow-hidden max-[359px]:px-4 max-[359px]:text-[15px]"
                 disabled={primaryDisabled}
               >
                 <AnimatePresence mode="popLayout" initial={false}>
@@ -2380,7 +2382,7 @@ function App() {
                     className="flex items-center gap-2"
                   >
                     {!primaryIconAtEnd && (
-                      <PrimaryIcon className="size-5 stroke-[2.4]" />
+                      <PrimaryIcon className="size-5 stroke-[2.4] max-[359px]:hidden" />
                     )}
                     {primaryLabel}
                     {primaryIconAtEnd && (
