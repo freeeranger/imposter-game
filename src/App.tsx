@@ -156,7 +156,8 @@ const toCategoryMap = (customCategories: CustomCategory[]) =>
     ]),
   );
 
-// "a, b; c" or a pasted list (one per line) becomes separate words.
+// A pasted "a, b; c" or list (one per line) becomes separate words. Typed words are kept
+// whole, so a word can still contain a comma.
 const splitWords = (text: string) =>
   text
     .split(/[,;\n]+/)
@@ -457,8 +458,10 @@ const PRANK_PRESETS = [0, 5, 10, 15, 20, 25];
 type BackLayer =
   | "confirm"
   | "deleteConfirm"
+  | "discardConfirm"
   | "picker"
   | "editor"
+  | "installHelp"
   | "license"
   | "settings"
   | "category"
@@ -859,6 +862,7 @@ function App() {
   }>({ id: null, name: "", words: [] });
   const [wordDraft, setWordDraft] = useState<string>("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState<boolean>(false);
   const autoDownloadStarted = useRef(false);
   const autoInstallPending = useRef(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
@@ -988,25 +992,57 @@ function App() {
     setKeepAwake(gameState !== "setup");
   }, [gameState]);
 
+  const draftName = editorDraft.name.trim();
+  const missingWords = Math.max(0, MIN_CUSTOM_WORDS - editorDraft.words.length);
+  const canSaveDraft = draftName.length > 0 && missingWords === 0;
+  const editorOriginal = customCategories.find(
+    (category) => category.id === editorDraft.id,
+  );
+  const isEditorDirty =
+    wordDraft.trim() !== "" ||
+    (editorOriginal
+      ? draftName !== editorOriginal.name ||
+        editorDraft.words.join("\n") !== editorOriginal.words.join("\n")
+      : draftName !== "" || editorDraft.words.length > 0);
+
+  const requestCloseEditor = () => {
+    if (isEditorDirty) {
+      haptic.tap();
+      setShowDiscardConfirm(true);
+    } else {
+      setIsEditorOpen(false);
+    }
+  };
+
+  const discardCategoryDraft = () => {
+    haptic.press();
+    setShowDiscardConfirm(false);
+    setIsEditorOpen(false);
+  };
+
   // Android back: close the top-most layer, or step out of a round. With nothing to close,
   // back isn't intercepted at all, so Android plays its own predictive back-to-home.
   const topLayer: BackLayer | null = showEndConfirm
     ? "confirm"
     : showDeleteConfirm
       ? "deleteConfirm"
-      : isNumberPickerOpen
-        ? "picker"
-        : isEditorOpen
-          ? "editor"
-          : showLicense
-            ? "license"
-            : showSettings
-              ? "settings"
-              : showCategorySheet
-                ? "category"
-                : showInfoModal
-                  ? "info"
-                  : null;
+      : showDiscardConfirm
+        ? "discardConfirm"
+        : isNumberPickerOpen
+          ? "picker"
+          : isEditorOpen
+            ? "editor"
+            : showInstallHelp
+              ? "installHelp"
+              : showLicense
+                ? "license"
+                : showSettings
+                  ? "settings"
+                  : showCategorySheet
+                    ? "category"
+                    : showInfoModal
+                      ? "info"
+                      : null;
   const canGoBack = topLayer !== null || gameState !== "setup";
 
   useEffect(() => {
@@ -1017,16 +1053,22 @@ function App() {
   const topLayerRef = useRef<BackLayer | null>(topLayer);
   const handleBackRef = useRef<() => void>(() => {});
   useEffect(() => {
-    topLayerRef.current = topLayer;
+    // A draft with changes asks before closing, so it shouldn't preview sliding away.
+    topLayerRef.current =
+      topLayer === "editor" && isEditorDirty ? null : topLayer;
     handleBackRef.current = () => {
       if (showEndConfirm) {
         setShowEndConfirm(false);
       } else if (showDeleteConfirm) {
         setShowDeleteConfirm(false);
+      } else if (showDiscardConfirm) {
+        setShowDiscardConfirm(false);
       } else if (isNumberPickerOpen) {
         setIsNumberPickerOpen(false);
       } else if (isEditorOpen) {
-        setIsEditorOpen(false);
+        requestCloseEditor();
+      } else if (showInstallHelp) {
+        setShowInstallHelp(false);
       } else if (showLicense) {
         setShowLicense(false);
       } else if (showSettings) {
@@ -1080,61 +1122,16 @@ function App() {
     [backProgress, backEdge],
   );
 
+  // Escape closes the top-most layer, the same way back does.
+  const hasOpenLayer = topLayer !== null;
   useEffect(() => {
-    if (
-      !showInfoModal &&
-      !showCategorySheet &&
-      !showSettings &&
-      !isNumberPickerOpen &&
-      !showEndConfirm &&
-      !showInstallHelp &&
-      !isEditorOpen
-    ) {
-      return;
-    }
-
+    if (!hasOpenLayer) return;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        if (showEndConfirm) {
-          setShowEndConfirm(false);
-          return;
-        }
-        if (showInstallHelp) {
-          setShowInstallHelp(false);
-          return;
-        }
-        if (showDeleteConfirm) {
-          setShowDeleteConfirm(false);
-          return;
-        }
-        if (isEditorOpen) {
-          setIsEditorOpen(false);
-          return;
-        }
-        setShowInfoModal(false);
-        setShowCategorySheet(false);
-        if (showLicense) {
-          setShowLicense(false);
-          return;
-        }
-        setShowSettings(false);
-        setIsNumberPickerOpen(false);
-      }
+      if (event.key === "Escape") handleBackRef.current();
     };
-
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [
-    showInfoModal,
-    showCategorySheet,
-    showSettings,
-    isNumberPickerOpen,
-    showLicense,
-    showEndConfirm,
-    showInstallHelp,
-    isEditorOpen,
-    showDeleteConfirm,
-  ]);
+  }, [hasOpenLayer]);
 
   useEffect(() => {
     try {
@@ -1392,8 +1389,7 @@ function App() {
     setIsEditorOpen(true);
   };
 
-  const addDraftWords = (text: string) => {
-    const words = splitWords(text);
+  const addDraftWords = (words: string[]) => {
     if (words.length === 0) return;
     haptic.tap();
     setEditorDraft((draft) => {
@@ -1407,10 +1403,6 @@ function App() {
       return { ...draft, words: nextWords };
     });
   };
-
-  const draftName = editorDraft.name.trim();
-  const missingWords = Math.max(0, MIN_CUSTOM_WORDS - editorDraft.words.length);
-  const canSaveDraft = draftName.length > 0 && missingWords === 0;
 
   const saveCategoryDraft = () => {
     if (!canSaveDraft) return;
@@ -2534,7 +2526,7 @@ function App() {
           <Page
             open={isEditorOpen}
             predictive={backTarget === "editor"}
-            onClose={() => setIsEditorOpen(false)}
+            onClose={requestCloseEditor}
             title={editorDraft.id ? "edit category" : "new category"}
             stacked
           >
@@ -2578,7 +2570,7 @@ function App() {
                   className="flex gap-2"
                   onSubmit={(event) => {
                     event.preventDefault();
-                    addDraftWords(wordDraft);
+                    addDraftWords([wordDraft.trim()].filter(Boolean));
                     setWordDraft("");
                   }}
                 >
@@ -2590,8 +2582,10 @@ function App() {
                     placeholder="add a word, or paste a list"
                     onChange={(event) => setWordDraft(event.target.value)}
                     onPaste={(event) => {
-                      const pasted = event.clipboardData.getData("text");
-                      if (splitWords(pasted).length > 1) {
+                      const pasted = splitWords(
+                        event.clipboardData.getData("text"),
+                      );
+                      if (pasted.length > 1) {
                         event.preventDefault();
                         addDraftWords(pasted);
                       }
@@ -2618,9 +2612,11 @@ function App() {
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.8 }}
                         transition={SPRING}
-                        className="flex h-10 items-center gap-0.5 rounded-full bg-secondary pr-1 pl-3.5 text-[15px] font-medium"
+                        className="flex min-h-10 max-w-full items-center gap-0.5 rounded-[20px] bg-secondary pr-1 pl-3.5 text-[15px] font-medium"
                       >
-                        <span>{word}</span>
+                        <span className="min-w-0 py-2 leading-tight [overflow-wrap:anywhere]">
+                          {word}
+                        </span>
                         <button
                           type="button"
                           aria-label={`Remove ${word}`}
@@ -2674,6 +2670,17 @@ function App() {
               </div>
             </div>
           </Page>
+
+          <ConfirmDialog
+            open={showDiscardConfirm}
+            predictive={backTarget === "discardConfirm"}
+            icon={<Trash2 className="size-7" aria-hidden />}
+            title="discard your changes?"
+            confirmLabel="discard"
+            cancelLabel="keep editing"
+            onConfirm={discardCategoryDraft}
+            onCancel={() => setShowDiscardConfirm(false)}
+          />
 
           <ConfirmDialog
             open={showDeleteConfirm}
@@ -3278,6 +3285,7 @@ function App() {
           {/* iPhone: how to install from Safari */}
           <Sheet
             open={showInstallHelp}
+            predictive={backTarget === "installHelp"}
             onClose={() => setShowInstallHelp(false)}
             labelledBy="install-help-title"
             className="gap-5"
