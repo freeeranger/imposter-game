@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import licenseText from "../LICENSE?raw";
 import type { CSSProperties, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { NumberStepper } from "@/components/ui/number-stepper";
@@ -21,6 +22,7 @@ import {
   Check,
   Loader2,
   Minus,
+  SunMoon,
   Plus,
   ChevronRight,
   ExternalLink,
@@ -40,13 +42,14 @@ import {
   APK_DOWNLOAD_URL,
   exitApp,
   externalLinkTarget,
-  downloadAndInstallUpdate,
+  downloadUpdate,
   fetchLatestVersion,
   hideSplashScreen,
   haptic,
   isNativeApp,
   isNewerVersion,
   onBackButton,
+  openUpdateInstaller,
   setHapticsEnabled,
   setKeepAwake,
   setSystemBarsTheme,
@@ -263,6 +266,12 @@ const getCategoryWords = (category: Category, difficulty: Difficulty): string[] 
 
 type GameState = "setup" | "pass" | "reveal" | "end";
 type Theme = "light" | "dark";
+type ThemePreference = Theme | "system";
+const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
+  { value: "system", label: "system" },
+  { value: "dark", label: "dark" },
+  { value: "light", label: "light" },
+];
 type PrankMode =
   | "everyone-imposter"
   | "different-words"
@@ -275,6 +284,8 @@ type PlayerAssignment = {
 
 const THEME_STORAGE_KEY = "imposter-game-theme";
 const HAPTICS_STORAGE_KEY = "imposter-game-haptics";
+const AUTO_UPDATE_STORAGE_KEY = "imposter-game-auto-update";
+const SYSTEM_DARK_QUERY = "(prefers-color-scheme: dark)";
 
 type NumberPickerKind = "players" | "imposters" | "prank";
 const PRANK_PRESETS = [0, 5, 10, 25, 50, 100];
@@ -285,12 +296,18 @@ type UpdateStatus =
   | "latest"
   | "available"
   | "downloading"
+  | "ready"
   | "error";
+
+// The GPL text is hard-wrapped at ~72 columns; rejoin each paragraph so it flows on a phone.
+const LICENSE_PARAGRAPHS = licenseText
+  .split(/\n\s*\n/)
+  .map((paragraph) => paragraph.split("\n").map((line) => line.trim()).join(" ").trim())
+  .filter(Boolean);
 
 const AUTHOR_NAME = "Lukas Viering";
 const AUTHOR_URL = "https://freeranger.dev";
 const WEBSITE_URL = "https://tjeneritz.se";
-const LICENSE_URL = "https://github.com/freeeranger/imposter-game/blob/main/LICENSE";
 const range = (from: number, to: number) =>
   Array.from({ length: Math.max(0, to - from + 1) }, (_, index) => from + index);
 const SETTINGS_STORAGE_KEY = "imposter-game-settings";
@@ -483,16 +500,34 @@ const getUniqueCategoryWords = (
 ): string[] => Array.from(new Set(getCategoryWords(category, difficulty)));
 
 function App() {
-  const [theme, setTheme] = useState<Theme>(() => {
+  const [themePreference, setThemePreference] = useState<ThemePreference>(() => {
     if (typeof window === "undefined") return "dark";
 
     const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-    if (savedTheme === "light" || savedTheme === "dark") {
+    if (savedTheme === "light" || savedTheme === "dark" || savedTheme === "system") {
       return savedTheme;
     }
 
     return "dark";
   });
+  const [systemPrefersDark, setSystemPrefersDark] = useState<boolean>(
+    () => window.matchMedia(SYSTEM_DARK_QUERY).matches,
+  );
+  const theme: Theme =
+    themePreference === "system"
+      ? systemPrefersDark
+        ? "dark"
+        : "light"
+      : themePreference;
+
+  // Follow the phone's light/dark switch live while "system" is chosen.
+  useEffect(() => {
+    const query = window.matchMedia(SYSTEM_DARK_QUERY);
+    const handleChange = (event: MediaQueryListEvent) =>
+      setSystemPrefersDark(event.matches);
+    query.addEventListener("change", handleChange);
+    return () => query.removeEventListener("change", handleChange);
+  }, []);
   const [settings] = useState(loadSettings);
   const [gameState, setGameState] = useState<GameState>("setup");
   const [playersCount, setPlayersCount] = useState<number>(
@@ -536,6 +571,17 @@ function App() {
   const [updateVersion, setUpdateVersion] = useState<string | null>(null);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
   const [downloadProgress, setDownloadProgress] = useState<number>(0);
+  const [downloadedUpdateUri, setDownloadedUpdateUri] = useState<string | null>(null);
+  const [autoUpdate, setAutoUpdate] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem(AUTO_UPDATE_STORAGE_KEY) !== "off";
+    } catch {
+      return true;
+    }
+  });
+  const [showLicense, setShowLicense] = useState<boolean>(false);
+  const autoDownloadStarted = useRef(false);
+  const autoInstallPending = useRef(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [isNumberPickerOpen, setIsNumberPickerOpen] = useState<boolean>(false);
   // Kept after closing so the sheet still has content while it animates away.
@@ -572,9 +618,16 @@ function App() {
     document
       .querySelector('meta[name="theme-color"]')
       ?.setAttribute("content", theme === "dark" ? "#15111f" : "#f5f1fc");
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
     setSystemBarsTheme(theme);
   }, [theme]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, themePreference);
+    } catch {
+      // ignore storage write errors (e.g. private mode)
+    }
+  }, [themePreference]);
 
   // App only: offer the newest APK when GitHub has a newer release than this build.
   useEffect(() => {
@@ -594,6 +647,42 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(AUTO_UPDATE_STORAGE_KEY, autoUpdate ? "on" : "off");
+    } catch {
+      // ignore storage write errors (e.g. private mode)
+    }
+  }, [autoUpdate]);
+
+  // Auto-update: fetch a newer APK in the background as soon as one is found.
+  useEffect(() => {
+    if (!isNativeApp || !autoUpdate || updateStatus !== "available") return;
+    if (autoDownloadStarted.current) return;
+    autoDownloadStarted.current = true;
+
+    void (async () => {
+      setDownloadProgress(0);
+      setUpdateStatus("downloading");
+      try {
+        const uri = await downloadUpdate(setDownloadProgress);
+        setDownloadedUpdateUri(uri);
+        setUpdateStatus("ready");
+        autoInstallPending.current = true;
+      } catch {
+        setUpdateStatus("available");
+      }
+    })();
+  }, [autoUpdate, updateStatus]);
+
+  // ...and offer it for install once nobody is mid-round. Android still asks to confirm.
+  useEffect(() => {
+    if (updateStatus !== "ready" || !downloadedUpdateUri) return;
+    if (!autoInstallPending.current || gameState !== "setup") return;
+    autoInstallPending.current = false;
+    void openUpdateInstaller(downloadedUpdateUri).catch(() => {});
+  }, [updateStatus, downloadedUpdateUri, gameState]);
+
   // Keep the screen on while the phone is passed around.
   useEffect(() => {
     setKeepAwake(gameState !== "setup");
@@ -605,6 +694,8 @@ function App() {
       onBackButton(() => {
         if (isNumberPickerOpen) {
           setIsNumberPickerOpen(false);
+        } else if (showLicense) {
+          setShowLicense(false);
         } else if (showSettings) {
           setShowSettings(false);
         } else if (showCategorySheet) {
@@ -621,7 +712,14 @@ function App() {
           exitApp();
         }
       }),
-    [isNumberPickerOpen, showSettings, showCategorySheet, showInfoModal, gameState],
+    [
+      isNumberPickerOpen,
+      showLicense,
+      showSettings,
+      showCategorySheet,
+      showInfoModal,
+      gameState,
+    ],
   );
 
   useEffect(() => {
@@ -633,6 +731,10 @@ function App() {
       if (event.key === "Escape") {
         setShowInfoModal(false);
         setShowCategorySheet(false);
+        if (showLicense) {
+          setShowLicense(false);
+          return;
+        }
         setShowSettings(false);
         setIsNumberPickerOpen(false);
       }
@@ -640,7 +742,7 @@ function App() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [showInfoModal, showCategorySheet, showSettings, isNumberPickerOpen]);
+  }, [showInfoModal, showCategorySheet, showSettings, isNumberPickerOpen, showLicense]);
 
   useEffect(() => {
     try {
@@ -845,15 +947,22 @@ function App() {
   const installUpdate = async () => {
     if (updateStatus === "downloading") return;
     haptic.press();
-    setDownloadProgress(0);
-    setUpdateStatus("downloading");
     try {
-      await downloadAndInstallUpdate(setDownloadProgress);
+      if (updateStatus === "ready" && downloadedUpdateUri) {
+        await openUpdateInstaller(downloadedUpdateUri);
+        return;
+      }
+      setDownloadProgress(0);
+      setUpdateStatus("downloading");
+      const uri = await downloadUpdate(setDownloadProgress);
+      setDownloadedUpdateUri(uri);
+      setUpdateStatus("ready");
+      await openUpdateInstaller(uri);
     } catch {
       // Fall back to the browser download if the in-app install fails.
       window.location.href = APK_DOWNLOAD_URL;
+      setUpdateStatus((status) => (status === "downloading" ? "available" : status));
     }
-    setUpdateStatus("available");
   };
 
   const applyPlayersCount = (value: number) => {
@@ -1985,11 +2094,12 @@ function App() {
               <div
                 role="radiogroup"
                 aria-labelledby="theme-label"
-                className="grid grid-cols-2 rounded-full bg-card p-1"
+                className="grid grid-cols-3 rounded-full bg-card p-1"
               >
-                {(["dark", "light"] as const).map((option) => {
-                  const isSelected = theme === option;
-                  const ThemeIcon = option === "dark" ? Moon : Sun;
+                {THEME_OPTIONS.map(({ value: option, label }) => {
+                  const isSelected = themePreference === option;
+                  const ThemeIcon =
+                    option === "system" ? SunMoon : option === "dark" ? Moon : Sun;
                   return (
                     <button
                       key={option}
@@ -1998,7 +2108,7 @@ function App() {
                       aria-checked={isSelected}
                       onClick={() => {
                         haptic.tap();
-                        setTheme(option);
+                        setThemePreference(option);
                       }}
                       className={cn(
                         "relative flex h-[42px] cursor-pointer items-center justify-center gap-2 rounded-full text-[15px] transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
@@ -2015,7 +2125,7 @@ function App() {
                         />
                       )}
                       <ThemeIcon className="relative size-4" />
-                      <span className="relative">{option}</span>
+                      <span className="relative">{label}</span>
                     </button>
                   );
                 })}
@@ -2039,7 +2149,7 @@ function App() {
 
             <motion.section variants={RISE} className="flex flex-col gap-2.5">
               <span className="px-1 text-[13px] font-semibold text-muted-foreground">
-                About
+                Version
               </span>
               <div className="flex flex-col divide-y divide-border/70 rounded-[24px] bg-card px-[18px]">
                 <div className="flex min-h-[54px] items-center justify-between">
@@ -2053,9 +2163,14 @@ function App() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (updateStatus === "available") void installUpdate();
-                      else if (updateStatus !== "checking" && updateStatus !== "downloading")
+                      if (updateStatus === "available" || updateStatus === "ready") {
+                        void installUpdate();
+                      } else if (
+                        updateStatus !== "checking" &&
+                        updateStatus !== "downloading"
+                      ) {
                         void checkForUpdates();
+                      }
                     }}
                     className="flex min-h-[54px] cursor-pointer items-center justify-between gap-3 text-left"
                   >
@@ -2069,7 +2184,9 @@ function App() {
                         transition={SPRING}
                         className={cn(
                           "flex items-center gap-1.5 text-sm font-semibold",
-                          updateStatus === "available" || updateStatus === "downloading"
+                          updateStatus === "available" ||
+                            updateStatus === "downloading" ||
+                            updateStatus === "ready"
                             ? "text-pink"
                             : updateStatus === "latest"
                               ? "text-muted-foreground"
@@ -2094,6 +2211,7 @@ function App() {
                             Downloading {Math.round(downloadProgress * 100)}%
                           </span>
                         )}
+                        {updateStatus === "ready" && <>v{updateVersion} ready</>}
                         {updateStatus === "error" && <>Couldn’t check · retry</>}
                         {updateStatus === "idle" && <>Check now</>}
                       </motion.span>
@@ -2108,31 +2226,22 @@ function App() {
                   </div>
                 )}
 
-                {[
-                  { label: "Made by", value: AUTHOR_NAME, href: AUTHOR_URL },
-                  { label: "Website", value: "tjeneritz.se", href: WEBSITE_URL },
-                  { label: "Source code", value: "GitHub", href: githubRepoUrl },
-                  { label: "License", value: "GPL-3.0", href: LICENSE_URL },
-                ].map((link) => (
-                  <a
-                    key={link.label}
-                    href={link.href}
-                    target={externalLinkTarget}
-                    rel="noreferrer"
-                    className="flex min-h-[54px] items-center justify-between gap-3"
-                  >
-                    <span className="text-[15px] font-medium">{link.label}</span>
-                    <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                      {link.value}
-                      <ExternalLink className="size-3.5" />
-                    </span>
-                  </a>
-                ))}
+                {isNativeApp && (
+                  <SettingRow id="auto-update" title="Auto-update">
+                    <Switch
+                      id="auto-update"
+                      checked={autoUpdate}
+                      onCheckedChange={setAutoUpdate}
+                    />
+                  </SettingRow>
+                )}
               </div>
 
               <AnimatePresence initial={false}>
                 {isNativeApp &&
-                  (updateStatus === "available" || updateStatus === "downloading") && (
+                  (updateStatus === "available" ||
+                    updateStatus === "downloading" ||
+                    updateStatus === "ready") && (
                     <motion.div
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
@@ -2158,6 +2267,11 @@ function App() {
                             <>
                               <Loader2 className="size-4 animate-spin" />
                               downloading {Math.round(downloadProgress * 100)}%
+                            </>
+                          ) : updateStatus === "ready" ? (
+                            <>
+                              <Download className="size-4" />
+                              install v{updateVersion}
                             </>
                           ) : (
                             <>
@@ -2187,6 +2301,47 @@ function App() {
               )}
             </motion.section>
 
+            <motion.section variants={RISE} className="flex flex-col gap-2.5">
+              <span className="px-1 text-[13px] font-semibold text-muted-foreground">
+                About
+              </span>
+              <div className="flex flex-col divide-y divide-border/70 rounded-[24px] bg-card px-[18px]">
+                {[
+                  { label: "Made by", value: AUTHOR_NAME, href: AUTHOR_URL },
+                  { label: "Website", value: "tjeneritz.se", href: WEBSITE_URL },
+                  { label: "Source code", value: "GitHub", href: githubRepoUrl },
+                ].map((link) => (
+                  <a
+                    key={link.label}
+                    href={link.href}
+                    target={externalLinkTarget}
+                    rel="noreferrer"
+                    className="flex min-h-[54px] items-center justify-between gap-3"
+                  >
+                    <span className="text-[15px] font-medium">{link.label}</span>
+                    <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      {link.value}
+                      <ExternalLink className="size-3.5" />
+                    </span>
+                  </a>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptic.tap();
+                    setShowLicense(true);
+                  }}
+                  className="flex min-h-[54px] cursor-pointer items-center justify-between gap-3 text-left"
+                >
+                  <span className="text-[15px] font-medium">License</span>
+                  <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                    GPL-3.0
+                    <ChevronRight className="size-4" />
+                  </span>
+                </button>
+              </div>
+            </motion.section>
+
             <motion.div variants={RISE} className="flex justify-center pb-2">
               <Button
                 variant="ghost"
@@ -2202,6 +2357,34 @@ function App() {
               </Button>
             </motion.div>
           </motion.div>
+        </Page>
+
+        {/* License, readable in-app */}
+        <Page
+          open={showLicense}
+          onClose={() => setShowLicense(false)}
+          title="license"
+          stacked
+        >
+          <div className="flex flex-col gap-4 pb-4 text-[14px] leading-relaxed text-muted-foreground">
+            {LICENSE_PARAGRAPHS.map((paragraph, index) => {
+              // Short lines are the license's own headings ("TERMS AND CONDITIONS", "0. Definitions.").
+              const isHeading = paragraph.length < 60 && !paragraph.endsWith(",");
+              return isHeading ? (
+                <h2
+                  key={index}
+                  className={cn(
+                    "font-semibold text-foreground",
+                    index === 0 && "font-display text-lg font-extrabold leading-snug",
+                  )}
+                >
+                  {paragraph}
+                </h2>
+              ) : (
+                <p key={index}>{paragraph}</p>
+              );
+            })}
+          </div>
         </Page>
       </div>
     </MotionConfig>

@@ -21,9 +21,14 @@
     <script>
       // Apply the saved theme before first paint so there is no white (or wrong-theme) flash.
       try {
-        if (localStorage.getItem("imposter-game-theme") !== "light") {
-          document.documentElement.classList.add("dark");
-        }
+        var savedTheme = localStorage.getItem("imposter-game-theme");
+        var isDark =
+          savedTheme === "light"
+            ? false
+            : savedTheme === "system"
+              ? matchMedia("(prefers-color-scheme: dark)").matches
+              : true;
+        if (isDark) document.documentElement.classList.add("dark");
       } catch {
         document.documentElement.classList.add("dark");
       }

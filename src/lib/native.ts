@@ -85,14 +85,11 @@ export const fetchLatestVersion = async (): Promise<string | null> => {
   }
 };
 
-// Downloads the newest APK into the app cache, then opens Android's installer for it.
-export const downloadAndInstallUpdate = async (
+// Downloads the newest APK into the app cache and returns its file URI.
+export const downloadUpdate = async (
   onProgress?: (fraction: number) => void,
-) => {
-  if (!isNativeApp) {
-    window.location.href = APK_DOWNLOAD_URL;
-    return;
-  }
+): Promise<string> => {
+  if (!isNativeApp) throw new Error("In-app updates only exist in the Android app");
 
   const { uri } = await Filesystem.getUri({
     directory: Directory.Cache,
@@ -116,11 +113,15 @@ export const downloadAndInstallUpdate = async (
     await listener?.remove();
   }
 
-  await FileOpener.open({
+  return uri;
+};
+
+// Hands a downloaded APK to Android's installer, which asks the user to confirm.
+export const openUpdateInstaller = (uri: string) =>
+  FileOpener.open({
     filePath: uri,
     contentType: "application/vnd.android.package-archive",
   });
-};
 
 export const isNewerVersion = (candidate: string, current: string) => {
   const candidateParts = candidate.split(".").map(Number);

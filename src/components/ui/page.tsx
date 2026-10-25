@@ -4,19 +4,22 @@ import { ChevronLeft } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { haptic } from "@/lib/native";
+import { cn } from "@/lib/utils";
 
 type PageProps = {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
+  // Stacks above another open page (e.g. license on top of settings).
+  stacked?: boolean;
 };
 
 const DISMISS_OFFSET = 110;
 const DISMISS_VELOCITY = 600;
 
 // Full-screen page that slides in from the right; tap back or swipe right to leave.
-function Page({ open, onClose, title, children }: PageProps) {
+function Page({ open, onClose, title, children, stacked = false }: PageProps) {
   return (
     <AnimatePresence>
       {open && (
@@ -43,7 +46,10 @@ function Page({ open, onClose, title, children }: PageProps) {
               onClose();
             }
           }}
-          className="fixed inset-0 z-40 flex touch-pan-y justify-center bg-background text-foreground shadow-[-16px_0_40px_rgb(0_0_0/0.35)]"
+          className={cn(
+            "fixed inset-0 flex touch-pan-y justify-center bg-background text-foreground shadow-[-16px_0_40px_rgb(0_0_0/0.35)]",
+            stacked ? "z-50" : "z-40",
+          )}
         >
           <div className="flex h-full w-full max-w-md flex-col px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pr-[max(1.25rem,env(safe-area-inset-right))] pb-[max(1.25rem,env(safe-area-inset-bottom))] pl-[max(1.25rem,env(safe-area-inset-left))]">
             <header className="flex h-11 shrink-0 items-center gap-1">
