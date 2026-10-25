@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { NumberStepper } from "@/components/ui/number-stepper";
 import { RollingNumber } from "@/components/ui/rolling-number";
+import { Page } from "@/components/ui/page";
 import { Sheet } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -18,11 +19,13 @@ import {
   ArrowRight,
   Download,
   Check,
+  Loader2,
+  Minus,
+  Plus,
   ChevronRight,
   ExternalLink,
   Eye,
   EyeOff,
-  Github,
   Info,
   Moon,
   Settings,
@@ -37,6 +40,7 @@ import {
   APK_DOWNLOAD_URL,
   exitApp,
   externalLinkTarget,
+  downloadAndInstallUpdate,
   fetchLatestVersion,
   hideSplashScreen,
   haptic,
@@ -273,7 +277,20 @@ const THEME_STORAGE_KEY = "imposter-game-theme";
 const HAPTICS_STORAGE_KEY = "imposter-game-haptics";
 
 type NumberPickerKind = "players" | "imposters" | "prank";
-const PRANK_OPTIONS = [0, 5, 10, 15, 20, 25, 30, 40, 50, 75, 100];
+const PRANK_PRESETS = [0, 5, 10, 25, 50, 100];
+
+type UpdateStatus =
+  | "idle"
+  | "checking"
+  | "latest"
+  | "available"
+  | "downloading"
+  | "error";
+
+const AUTHOR_NAME = "Lukas Viering";
+const AUTHOR_URL = "https://freeranger.dev";
+const WEBSITE_URL = "https://tjeneritz.se";
+const LICENSE_URL = "https://github.com/freeeranger/imposter-game/blob/main/LICENSE";
 const range = (from: number, to: number) =>
   Array.from({ length: Math.max(0, to - from + 1) }, (_, index) => from + index);
 const SETTINGS_STORAGE_KEY = "imposter-game-settings";
@@ -517,6 +534,8 @@ function App() {
   const [showInfoModal, setShowInfoModal] = useState<boolean>(false);
   const [showCategorySheet, setShowCategorySheet] = useState<boolean>(false);
   const [updateVersion, setUpdateVersion] = useState<string | null>(null);
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
+  const [downloadProgress, setDownloadProgress] = useState<number>(0);
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [isNumberPickerOpen, setIsNumberPickerOpen] = useState<boolean>(false);
   // Kept after closing so the sheet still has content while it animates away.
@@ -562,8 +581,12 @@ function App() {
     if (!isNativeApp) return;
     let isCancelled = false;
     void fetchLatestVersion().then((latestVersion) => {
-      if (!isCancelled && latestVersion && isNewerVersion(latestVersion, APP_VERSION)) {
+      if (isCancelled || !latestVersion) return;
+      if (isNewerVersion(latestVersion, APP_VERSION)) {
         setUpdateVersion(latestVersion);
+        setUpdateStatus("available");
+      } else {
+        setUpdateStatus("latest");
       }
     });
     return () => {
@@ -801,6 +824,38 @@ function App() {
     nextTurn();
   };
 
+  const checkForUpdates = async () => {
+    haptic.tap();
+    setUpdateStatus("checking");
+    // A short floor so "checking…" registers instead of flickering.
+    const [latestVersion] = await Promise.all([
+      fetchLatestVersion(),
+      new Promise((resolve) => window.setTimeout(resolve, 500)),
+    ]);
+    if (!latestVersion) {
+      setUpdateStatus("error");
+    } else if (isNewerVersion(latestVersion, APP_VERSION)) {
+      setUpdateVersion(latestVersion);
+      setUpdateStatus("available");
+    } else {
+      setUpdateStatus("latest");
+    }
+  };
+
+  const installUpdate = async () => {
+    if (updateStatus === "downloading") return;
+    haptic.press();
+    setDownloadProgress(0);
+    setUpdateStatus("downloading");
+    try {
+      await downloadAndInstallUpdate(setDownloadProgress);
+    } catch {
+      // Fall back to the browser download if the in-app install fails.
+      window.location.href = APK_DOWNLOAD_URL;
+    }
+    setUpdateStatus("available");
+  };
+
   const applyPlayersCount = (value: number) => {
     setPlayersCount(value);
     if (impostersCount >= value) {
@@ -913,7 +968,7 @@ function App() {
     },
     prank: {
       title: "prank rounds",
-      options: PRANK_OPTIONS,
+      options: PRANK_PRESETS,
       value: prankProbability,
       apply: setPrankProbability,
       suffix: "%",
@@ -993,11 +1048,12 @@ function App() {
                   className="-mx-5 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain px-5 pt-5 pb-2"
                 >
                   {updateVersion && (
-                    <motion.a
+                    <motion.button
+                      type="button"
                       variants={RISE}
-                      href={APK_DOWNLOAD_URL}
+                      onClick={installUpdate}
                       whileTap={{ scale: 0.98 }}
-                      className="flex shrink-0 items-center justify-between gap-3 rounded-[20px] bg-pink py-3 pr-3 pl-[18px] text-pink-foreground"
+                      className="flex shrink-0 cursor-pointer items-center justify-between gap-3 rounded-[20px] bg-pink py-3 pr-3 pl-[18px] text-left text-pink-foreground"
                     >
                       <span className="flex flex-col">
                         <span className="text-[15px] font-bold">update available</span>
@@ -1005,11 +1061,20 @@ function App() {
                           v{updateVersion} is out
                         </span>
                       </span>
-                      <span className="flex h-11 items-center gap-1.5 rounded-full bg-pink-foreground px-4 text-sm font-bold text-pink">
-                        <Download className="size-4" />
-                        download
+                      <span className="flex h-11 items-center gap-1.5 rounded-full bg-pink-foreground px-4 text-sm font-bold text-pink tabular-nums">
+                        {updateStatus === "downloading" ? (
+                          <>
+                            <Loader2 className="size-4 animate-spin" />
+                            {Math.round(downloadProgress * 100)}%
+                          </>
+                        ) : (
+                          <>
+                            <Download className="size-4" />
+                            install
+                          </>
+                        )}
                       </span>
-                    </motion.a>
+                    </motion.button>
                   )}
                   <motion.div
                     variants={RISE}
@@ -1222,7 +1287,6 @@ function App() {
                         size="sm"
                         min={0}
                         max={100}
-                        step={5}
                         value={prankProbability}
                         onChange={setPrankProbability}
                         onPick={() => openNumberPicker("prank")}
@@ -1765,83 +1829,151 @@ function App() {
             </div>
           }
         >
-          <motion.div
-            variants={{
-              initial: {},
-              animate: { transition: { staggerChildren: 0.008, delayChildren: 0.02 } },
-            }}
-            initial="initial"
-            animate="animate"
-            role="radiogroup"
-            aria-labelledby="number-picker-title"
-            className={cn(
-              "grid gap-2 pb-1",
-              numberPicker.suffix ? "grid-cols-4" : "grid-cols-6",
-            )}
-          >
-            {numberPicker.options.map((option) => {
-              const isSelected = option === numberPicker.value;
-              return (
-                <motion.button
-                  key={option}
-                  variants={TILE}
-                  whileTap={{ scale: 0.92 }}
-                  type="button"
-                  role="radio"
-                  aria-checked={isSelected}
+          {numberPickerKind === "prank" ? (
+            // Prank chance needs 1% precision, so it gets a slider instead of a grid.
+            <motion.div
+              variants={STAGGER}
+              initial="initial"
+              animate="animate"
+              className="flex flex-col gap-5 pb-1"
+            >
+              <motion.div variants={RISE} className="flex items-center justify-between">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label="Less prank chance"
+                  disabled={prankProbability <= 0}
                   onClick={() => {
                     haptic.tap();
-                    numberPicker.apply(option);
-                    window.setTimeout(() => setIsNumberPickerOpen(false), 140);
+                    setPrankProbability(Math.max(0, prankProbability - 1));
                   }}
-                  className={cn(
-                    "h-14 cursor-pointer rounded-2xl font-display text-xl font-extrabold tabular-nums transition-colors duration-150 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
-                    isSelected
-                      ? numberPickerKind === "imposters"
-                        ? "bg-pink text-pink-foreground"
-                        : "bg-primary text-primary-foreground"
-                      : "bg-secondary text-secondary-foreground",
-                  )}
                 >
-                  {option}
-                  {numberPicker.suffix}
-                </motion.button>
-              );
-            })}
-          </motion.div>
+                  <Minus className="size-5 stroke-[2.5]" />
+                </Button>
+                <span className="flex items-baseline font-display text-5xl font-extrabold tabular-nums">
+                  <RollingNumber value={prankProbability} />
+                  <span className="text-3xl">%</span>
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label="More prank chance"
+                  disabled={prankProbability >= 100}
+                  onClick={() => {
+                    haptic.tap();
+                    setPrankProbability(Math.min(100, prankProbability + 1));
+                  }}
+                >
+                  <Plus className="size-5 stroke-[2.5]" />
+                </Button>
+              </motion.div>
+              <motion.input
+                variants={RISE}
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={prankProbability}
+                aria-label="Prank chance"
+                onChange={(event) => {
+                  const nextValue = Number(event.target.value);
+                  // Tick on every 5% so dragging feels notched without buzzing constantly.
+                  if (nextValue % 5 === 0) haptic.tap();
+                  setPrankProbability(nextValue);
+                }}
+                style={{ "--fill": `${prankProbability}%` } as CSSProperties}
+                className="range-slider w-full"
+              />
+              <motion.div variants={RISE} className="grid grid-cols-6 gap-2">
+                {PRANK_PRESETS.map((preset) => (
+                  <motion.button
+                    key={preset}
+                    type="button"
+                    whileTap={{ scale: 0.92 }}
+                    onClick={() => {
+                      haptic.tap();
+                      setPrankProbability(preset);
+                    }}
+                    className={cn(
+                      "h-11 cursor-pointer rounded-full text-sm font-bold tabular-nums transition-colors duration-150 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
+                      preset === prankProbability
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-secondary text-secondary-foreground",
+                    )}
+                  >
+                    {preset}%
+                  </motion.button>
+                ))}
+              </motion.div>
+              <motion.div variants={RISE}>
+                <Button
+                  size="lg"
+                  className="h-[52px] w-full text-[17px]"
+                  onClick={() => setIsNumberPickerOpen(false)}
+                >
+                  done
+                </Button>
+              </motion.div>
+            </motion.div>
+          ) : (
+          <motion.div
+              variants={{
+                initial: {},
+                animate: { transition: { staggerChildren: 0.008, delayChildren: 0.02 } },
+              }}
+              initial="initial"
+              animate="animate"
+              role="radiogroup"
+              aria-labelledby="number-picker-title"
+              className={cn(
+                "grid gap-2 pb-1",
+                numberPicker.suffix ? "grid-cols-4" : "grid-cols-6",
+              )}
+            >
+              {numberPicker.options.map((option) => {
+                const isSelected = option === numberPicker.value;
+                return (
+                  <motion.button
+                    key={option}
+                    variants={TILE}
+                    whileTap={{ scale: 0.92 }}
+                    type="button"
+                    role="radio"
+                    aria-checked={isSelected}
+                    onClick={() => {
+                      haptic.tap();
+                      numberPicker.apply(option);
+                      window.setTimeout(() => setIsNumberPickerOpen(false), 140);
+                    }}
+                    className={cn(
+                      "h-14 cursor-pointer rounded-2xl font-display text-xl font-extrabold tabular-nums transition-colors duration-150 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
+                      isSelected
+                        ? numberPickerKind === "imposters"
+                          ? "bg-pink text-pink-foreground"
+                          : "bg-primary text-primary-foreground"
+                        : "bg-secondary text-secondary-foreground",
+                    )}
+                  >
+                    {option}
+                    {numberPicker.suffix}
+                  </motion.button>
+                );
+              })}
+            </motion.div>
+          )}
         </Sheet>
 
         {/* Settings */}
-        <Sheet
+        <Page
           open={showSettings}
           onClose={() => setShowSettings(false)}
-          labelledBy="settings-sheet-title"
-          className="gap-5"
-          header={
-            <div className="flex h-11 items-center justify-between">
-              <h2
-                id="settings-sheet-title"
-                className="font-display text-[22px] font-extrabold tracking-[-0.02em]"
-              >
-                settings
-              </h2>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="-mr-2.5"
-                onClick={() => setShowSettings(false)}
-                aria-label="Close"
-              >
-                <X className="size-5 stroke-[2.2]" />
-              </Button>
-            </div>
-          }
+          title="settings"
         >
           <motion.div
             variants={STAGGER}
             initial="initial"
             animate="animate"
-            className="-mx-5 flex min-h-0 flex-col gap-5 overflow-y-auto px-5"
+            className="flex flex-col gap-7"
           >
             <motion.section variants={RISE} className="flex flex-col gap-2.5">
               <span
@@ -1853,7 +1985,7 @@ function App() {
               <div
                 role="radiogroup"
                 aria-labelledby="theme-label"
-                className="grid grid-cols-2 rounded-full bg-background p-1"
+                className="grid grid-cols-2 rounded-full bg-card p-1"
               >
                 {(["dark", "light"] as const).map((option) => {
                   const isSelected = theme === option;
@@ -1893,9 +2025,9 @@ function App() {
             {isNativeApp && (
               <motion.section
                 variants={RISE}
-                className="rounded-[20px] bg-secondary pr-3 pl-[18px]"
+                className="rounded-[24px] bg-card pr-3 pl-[18px]"
               >
-                <SettingRow id="haptics" title="Vibration">
+                <SettingRow id="haptics" title="Vibrations">
                   <Switch
                     id="haptics"
                     checked={hapticsOn}
@@ -1909,54 +2041,140 @@ function App() {
               <span className="px-1 text-[13px] font-semibold text-muted-foreground">
                 About
               </span>
-              <div className="flex flex-col divide-y divide-border/70 rounded-[20px] bg-secondary px-[18px]">
-                <div className="flex min-h-[52px] items-center justify-between">
+              <div className="flex flex-col divide-y divide-border/70 rounded-[24px] bg-card px-[18px]">
+                <div className="flex min-h-[54px] items-center justify-between">
                   <span className="text-[15px] font-medium">Version</span>
                   <span className="font-display text-sm font-extrabold">
                     v{APP_VERSION}
                   </span>
                 </div>
-                {isNativeApp && updateVersion && (
-                  <a
-                    href={APK_DOWNLOAD_URL}
-                    className="flex min-h-[52px] items-center justify-between text-pink"
+
+                {isNativeApp ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (updateStatus === "available") void installUpdate();
+                      else if (updateStatus !== "checking" && updateStatus !== "downloading")
+                        void checkForUpdates();
+                    }}
+                    className="flex min-h-[54px] cursor-pointer items-center justify-between gap-3 text-left"
                   >
-                    <span className="text-[15px] font-semibold">
-                      Update to v{updateVersion}
+                    <span className="text-[15px] font-medium">Updates</span>
+                    <AnimatePresence mode="popLayout" initial={false}>
+                      <motion.span
+                        key={updateStatus}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={SPRING}
+                        className={cn(
+                          "flex items-center gap-1.5 text-sm font-semibold",
+                          updateStatus === "available" || updateStatus === "downloading"
+                            ? "text-pink"
+                            : updateStatus === "latest"
+                              ? "text-muted-foreground"
+                              : "text-highlight",
+                        )}
+                      >
+                        {updateStatus === "checking" && (
+                          <>
+                            <Loader2 className="size-4 animate-spin" />
+                            Checking…
+                          </>
+                        )}
+                        {updateStatus === "latest" && (
+                          <>
+                            <Check className="size-4 stroke-[2.5]" />
+                            Up to date
+                          </>
+                        )}
+                        {updateStatus === "available" && <>v{updateVersion} available</>}
+                        {updateStatus === "downloading" && (
+                          <span className="tabular-nums">
+                            Downloading {Math.round(downloadProgress * 100)}%
+                          </span>
+                        )}
+                        {updateStatus === "error" && <>Couldn’t check · retry</>}
+                        {updateStatus === "idle" && <>Check now</>}
+                      </motion.span>
+                    </AnimatePresence>
+                  </button>
+                ) : (
+                  <div className="flex min-h-[54px] items-center justify-between gap-3">
+                    <span className="text-[15px] font-medium">Updates</span>
+                    <span className="text-sm text-muted-foreground">
+                      Always latest on the web
                     </span>
-                    <Download className="size-4" />
-                  </a>
+                  </div>
                 )}
-                <a
-                  href="https://tjeneritz.se"
-                  target={externalLinkTarget}
-                  rel="noreferrer"
-                  className="flex min-h-[52px] items-center justify-between"
-                >
-                  <span className="text-[15px] font-medium">Made by</span>
-                  <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                    tjeneritz.se
-                    <ExternalLink className="size-3.5" />
-                  </span>
-                </a>
-                <a
-                  href={githubRepoUrl}
-                  target={externalLinkTarget}
-                  rel="noreferrer"
-                  className="flex min-h-[52px] items-center justify-between"
-                >
-                  <span className="text-[15px] font-medium">Source code</span>
-                  <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                    <Github className="size-3.5" />
-                    GitHub
-                    <ExternalLink className="size-3.5" />
-                  </span>
-                </a>
+
+                {[
+                  { label: "Made by", value: AUTHOR_NAME, href: AUTHOR_URL },
+                  { label: "Website", value: "tjeneritz.se", href: WEBSITE_URL },
+                  { label: "Source code", value: "GitHub", href: githubRepoUrl },
+                  { label: "License", value: "GPL-3.0", href: LICENSE_URL },
+                ].map((link) => (
+                  <a
+                    key={link.label}
+                    href={link.href}
+                    target={externalLinkTarget}
+                    rel="noreferrer"
+                    className="flex min-h-[54px] items-center justify-between gap-3"
+                  >
+                    <span className="text-[15px] font-medium">{link.label}</span>
+                    <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      {link.value}
+                      <ExternalLink className="size-3.5" />
+                    </span>
+                  </a>
+                ))}
               </div>
+
+              <AnimatePresence initial={false}>
+                {isNativeApp &&
+                  (updateStatus === "available" || updateStatus === "downloading") && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={SPRING}
+                      className="overflow-hidden"
+                    >
+                      <button
+                        type="button"
+                        onClick={installUpdate}
+                        disabled={updateStatus === "downloading"}
+                        className="relative mt-1 flex h-[52px] w-full cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-full bg-primary font-display text-[15px] font-extrabold text-primary-foreground transition-[scale] active:scale-[0.98] disabled:cursor-default"
+                      >
+                        {updateStatus === "downloading" && (
+                          <motion.span
+                            className="absolute inset-y-0 left-0 bg-primary-foreground/15"
+                            animate={{ width: `${Math.round(downloadProgress * 100)}%` }}
+                            transition={{ duration: 0.2 }}
+                          />
+                        )}
+                        <span className="relative flex items-center gap-2 tabular-nums">
+                          {updateStatus === "downloading" ? (
+                            <>
+                              <Loader2 className="size-4 animate-spin" />
+                              downloading {Math.round(downloadProgress * 100)}%
+                            </>
+                          ) : (
+                            <>
+                              <Download className="size-4" />
+                              download & install v{updateVersion}
+                            </>
+                          )}
+                        </span>
+                      </button>
+                    </motion.div>
+                  )}
+              </AnimatePresence>
+
               {!isNativeApp && (
                 <a
                   href={APK_DOWNLOAD_URL}
-                  className="flex h-12 items-center justify-between rounded-full bg-primary px-5 text-sm font-bold text-primary-foreground transition-[filter,scale] hover:brightness-105 active:scale-[0.98]"
+                  className="mt-1 flex h-12 items-center justify-between rounded-full bg-primary px-5 text-sm font-bold text-primary-foreground transition-[filter,scale] hover:brightness-105 active:scale-[0.98]"
                 >
                   <span className="flex items-center gap-2">
                     <Download className="size-4" />
@@ -1969,7 +2187,7 @@ function App() {
               )}
             </motion.section>
 
-            <motion.div variants={RISE} className="flex justify-center pb-1">
+            <motion.div variants={RISE} className="flex justify-center pb-2">
               <Button
                 variant="ghost"
                 size="sm"
@@ -1984,7 +2202,7 @@ function App() {
               </Button>
             </motion.div>
           </motion.div>
-        </Sheet>
+        </Page>
       </div>
     </MotionConfig>
   );

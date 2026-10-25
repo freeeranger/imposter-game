@@ -3,6 +3,9 @@ import { App } from "@capacitor/app";
 import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
 import { KeepAwake } from "@capacitor-community/keep-awake";
 import { SplashScreen } from "@capacitor/splash-screen";
+import { Directory, Filesystem } from "@capacitor/filesystem";
+import { FileTransfer } from "@capacitor/file-transfer";
+import { FileOpener } from "@capacitor-community/file-opener";
 
 // Native-only features. Every helper is a safe no-op in the browser.
 export const isNativeApp = Capacitor.isNativePlatform();
@@ -80,6 +83,43 @@ export const fetchLatestVersion = async (): Promise<string | null> => {
   } catch {
     return null;
   }
+};
+
+// Downloads the newest APK into the app cache, then opens Android's installer for it.
+export const downloadAndInstallUpdate = async (
+  onProgress?: (fraction: number) => void,
+) => {
+  if (!isNativeApp) {
+    window.location.href = APK_DOWNLOAD_URL;
+    return;
+  }
+
+  const { uri } = await Filesystem.getUri({
+    directory: Directory.Cache,
+    path: "imposter-update.apk",
+  });
+  const listener = onProgress
+    ? await FileTransfer.addListener("progress", (status) => {
+        if (status.lengthComputable && status.contentLength > 0) {
+          onProgress(status.bytes / status.contentLength);
+        }
+      })
+    : null;
+
+  try {
+    await FileTransfer.downloadFile({
+      url: APK_DOWNLOAD_URL,
+      path: uri,
+      progress: Boolean(onProgress),
+    });
+  } finally {
+    await listener?.remove();
+  }
+
+  await FileOpener.open({
+    filePath: uri,
+    contentType: "application/vnd.android.package-archive",
+  });
 };
 
 export const isNewerVersion = (candidate: string, current: string) => {

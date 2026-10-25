@@ -170,3 +170,61 @@
     @apply bg-background text-foreground font-sans antialiased;
   }
 }
+
+/* Prank slider: lime fill up to the value (--fill), chunky thumb with a ground-colored ring. */
+.range-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 36px;
+  background: transparent;
+  cursor: pointer;
+  touch-action: pan-y;
+}
+.range-slider::-webkit-slider-runnable-track {
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--primary) var(--fill, 0%),
+    var(--secondary) var(--fill, 0%)
+  );
+}
+.range-slider::-moz-range-track {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--secondary);
+}
+.range-slider::-moz-range-progress {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--primary);
+}
+.range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 30px;
+  height: 30px;
+  margin-top: -10px;
+  border-radius: 999px;
+  background: var(--primary);
+  box-shadow: 0 0 0 5px var(--card);
+  transition: scale 150ms;
+}
+.range-slider:active::-webkit-slider-thumb {
+  scale: 1.12;
+}
+.range-slider::-moz-range-thumb {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--primary);
+  box-shadow: 0 0 0 5px var(--card);
+}
+.range-slider:focus-visible {
+  outline: none;
+}
+.range-slider:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 5px var(--card), 0 0 0 8px color-mix(in oklab, var(--ring) 60%, transparent);
+}
+

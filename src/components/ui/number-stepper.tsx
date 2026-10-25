@@ -79,7 +79,7 @@ function NumberStepper({
             ? cn(
                 // Fixed height so the row doesn't jump when two digits shrink the type.
                 "h-14 min-w-0 flex-1 items-center",
-                value >= 10 ? "text-[32px]" : "text-[50px]",
+                value >= 10 ? "text-[28px]" : "text-[50px]",
               )
             : "text-[17px]",
           valueClassName,
