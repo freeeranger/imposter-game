@@ -40,12 +40,43 @@ export const haptic = {
     runHaptic(() => Haptics.notification({ type: NotificationType.Success })),
 };
 
-// Once fonts are in, swap the native splash for the app with a short fade.
-export const hideSplashScreen = () => {
-  if (!isNativeApp) return;
-  void document.fonts.ready.then(() =>
-    SplashScreen.hide({ fadeOutDuration: 250 }).catch(() => {}),
-  );
+const SPLASH_FADE_MS = 280;
+const SMOOTH_FRAME_MS = 70;
+const SMOOTH_FRAMES_NEEDED = 3;
+const REVEAL_TIMEOUT_MS = 1500;
+
+// While Android's splash is up the WebView isn't drawing, so animations started then finish
+// unseen. Wait until it is actually producing frames again before calling back.
+const whenRendering = (callback: () => void) => {
+  let lastFrame = 0;
+  let smoothFrames = 0;
+  let done = false;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    callback();
+  };
+  const tick = (now: number) => {
+    smoothFrames = lastFrame && now - lastFrame < SMOOTH_FRAME_MS ? smoothFrames + 1 : 0;
+    lastFrame = now;
+    if (smoothFrames >= SMOOTH_FRAMES_NEEDED) finish();
+    else if (!done) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+  window.setTimeout(finish, REVEAL_TIMEOUT_MS);
+};
+
+// Once fonts are in, fade the native splash out, then start the app's entrance as soon as
+// the screen is really rendering, so the UI animates in instead of just "popping" in.
+export const hideSplashScreen = (onReveal: () => void) => {
+  if (!isNativeApp) {
+    onReveal();
+    return;
+  }
+  void document.fonts.ready.then(() => {
+    SplashScreen.hide({ fadeOutDuration: SPLASH_FADE_MS }).catch(() => {});
+    whenRendering(onReveal);
+  });
 };
 
 export const setKeepAwake = (keepAwake: boolean) =>

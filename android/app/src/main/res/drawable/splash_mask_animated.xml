@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Splash icon: the solid lime mask (same shape as the app icon), drawn as a vector so it
+  stays crisp at any density. It pops in with a little overshoot, then the pink eyes light up.
+  288dp canvas with the mask kept inside the 192dp circle Android shows on the splash.
+-->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt">
+    <aapt:attr name="android:drawable">
+        <vector
+            android:width="288dp"
+            android:height="288dp"
+            android:viewportWidth="288"
+            android:viewportHeight="288">
+            <!-- Pop-in happens around the canvas center. -->
+            <group
+                android:name="pop"
+                android:pivotX="144"
+                android:pivotY="144"
+                android:scaleX="0"
+                android:scaleY="0">
+                <!-- Mask is 20x13 units on a 24-unit grid; 7.5x scale, centered and nudged down optically. -->
+                <group
+                    android:translateX="54"
+                    android:translateY="53.75"
+                    android:scaleX="7.5"
+                    android:scaleY="7.5">
+                    <path
+                        android:fillColor="#C6FF3D"
+                        android:pathData="M4,6a2,2 0 0,0 -2,2v4a5,5 0 0,0 5,5 8,8 0 0,1 5,2 8,8 0 0,1 5,-2 5,5 0 0,0 5,-5V8a2,2 0 0,0 -2,-2h-3a8,8 0 0,0 -5,2 8,8 0 0,0 -5,-2z" />
+                    <group
+                        android:pivotX="7.4"
+                        android:pivotY="11.2"
+                        android:rotation="16">
+                        <path
+                            android:name="leftEye"
+                            android:fillAlpha="0"
+                            android:fillColor="#FF4FA3"
+                            android:pathData="M4.9,11.2a2.5,1.35 0 1,0 5,0a2.5,1.35 0 1,0 -5,0z" />
+                    </group>
+                    <group
+                        android:pivotX="16.6"
+                        android:pivotY="11.2"
+                        android:rotation="-16">
+                        <path
+                            android:name="rightEye"
+                            android:fillAlpha="0"
+                            android:fillColor="#FF4FA3"
+                            android:pathData="M14.1,11.2a2.5,1.35 0 1,0 5,0a2.5,1.35 0 1,0 -5,0z" />
+                    </group>
+                </group>
+            </group>
+        </vector>
+    </aapt:attr>
+
+    <target android:name="pop">
+        <aapt:attr name="android:animation">
+            <set>
+                <objectAnimator
+                    android:duration="420"
+                    android:interpolator="@android:interpolator/overshoot"
+                    android:propertyName="scaleX"
+                    android:valueFrom="0"
+                    android:valueTo="1"
+                    android:valueType="floatType" />
+                <objectAnimator
+                    android:duration="420"
+                    android:interpolator="@android:interpolator/overshoot"
+                    android:propertyName="scaleY"
+                    android:valueFrom="0"
+                    android:valueTo="1"
+                    android:valueType="floatType" />
+            </set>
+        </aapt:attr>
+    </target>
+
+    <target android:name="leftEye">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:duration="180"
+                android:propertyName="fillAlpha"
+                android:startOffset="300"
+                android:valueFrom="0"
+                android:valueTo="1"
+                android:valueType="floatType" />
+        </aapt:attr>
+    </target>
+
+    <target android:name="rightEye">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:duration="180"
+                android:propertyName="fillAlpha"
+                android:startOffset="360"
+                android:valueFrom="0"
+                android:valueTo="1"
+                android:valueType="floatType" />
+        </aapt:attr>
+    </target>
+</animated-vector>

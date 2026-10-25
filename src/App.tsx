@@ -288,6 +288,7 @@ type PlayerAssignment = {
 const THEME_STORAGE_KEY = "imposter-game-theme";
 const HAPTICS_STORAGE_KEY = "imposter-game-haptics";
 const AUTO_UPDATE_STORAGE_KEY = "imposter-game-auto-update";
+const DISMISSED_UPDATE_STORAGE_KEY = "imposter-game-dismissed-update";
 const SYSTEM_DARK_QUERY = "(prefers-color-scheme: dark)";
 
 type NumberPickerKind = "players" | "imposters" | "prank";
@@ -586,6 +587,16 @@ function App() {
     }
   });
   const [showLicense, setShowLicense] = useState<boolean>(false);
+  // The update banner can be dismissed per version; a newer release brings it back.
+  const [dismissedUpdateVersion, setDismissedUpdateVersion] = useState<string | null>(
+    () => {
+      try {
+        return window.localStorage.getItem(DISMISSED_UPDATE_STORAGE_KEY);
+      } catch {
+        return null;
+      }
+    },
+  );
   const [showEndConfirm, setShowEndConfirm] = useState<boolean>(false);
   const autoDownloadStarted = useRef(false);
   const autoInstallPending = useRef(false);
@@ -602,8 +613,10 @@ function App() {
     }
   });
 
+  // Until the splash starts leaving, render nothing so the entrance animation is actually seen.
+  const [hasLaunched, setHasLaunched] = useState<boolean>(!isNativeApp);
   useEffect(() => {
-    hideSplashScreen();
+    hideSplashScreen(() => setHasLaunched(true));
   }, []);
 
   useEffect(() => {
@@ -1044,6 +1057,18 @@ function App() {
     }
   };
 
+  const dismissUpdate = () => {
+    haptic.tap();
+    setDismissedUpdateVersion(updateVersion);
+    try {
+      if (updateVersion) {
+        window.localStorage.setItem(DISMISSED_UPDATE_STORAGE_KEY, updateVersion);
+      }
+    } catch {
+      // ignore storage write errors (e.g. private mode)
+    }
+  };
+
   const applyPlayersCount = (value: number) => {
     setPlayersCount(value);
     if (impostersCount >= value) {
@@ -1162,6 +1187,15 @@ function App() {
       suffix: "%",
     },
   }[numberPickerKind];
+  const hasPendingUpdate =
+    updateVersion !== null &&
+    (updateStatus === "available" ||
+      updateStatus === "downloading" ||
+      updateStatus === "ready");
+  const showUpdateChip =
+    hasPendingUpdate && autoUpdate && updateStatus !== "available";
+  const showUpdateBanner =
+    hasPendingUpdate && !autoUpdate && dismissedUpdateVersion !== updateVersion;
   const selectedWordCount = selectedCategoryInfo
     ? getUniqueCategoryWords(selectedCategoryInfo, selectedDifficulty).length
     : 0;
@@ -1176,7 +1210,7 @@ function App() {
           {/* Top bar: stays put while the content below changes */}
           <div className="shrink-0">
             <AnimatePresence mode="wait">
-              {gameState === "setup" && (
+              {hasLaunched && gameState === "setup" && (
                 <motion.header
                   key="setup-bar"
                   initial={{ opacity: 0, y: -8 }}
@@ -1227,7 +1261,7 @@ function App() {
 
           <main className="relative flex min-h-0 flex-1 flex-col [perspective:1200px]">
             <AnimatePresence mode="wait" custom={swipeDirection}>
-              {gameState === "setup" && (
+              {hasLaunched && gameState === "setup" && (
                 <motion.div
                   key="setup"
                   variants={STAGGER}
@@ -1236,35 +1270,83 @@ function App() {
                   exit={FADE_OUT}
                   className="-mx-5 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain px-5 pt-5 pb-2"
                 >
-                  {updateVersion && (
-                    <motion.button
-                      type="button"
-                      variants={RISE}
-                      onClick={installUpdate}
-                      whileTap={{ scale: 0.98 }}
-                      className="flex shrink-0 cursor-pointer items-center justify-between gap-3 rounded-[20px] bg-pink py-3 pr-3 pl-[18px] text-left text-pink-foreground"
-                    >
-                      <span className="flex flex-col">
-                        <span className="text-[15px] font-bold">update available</span>
-                        <span className="text-[13px] font-medium opacity-80">
-                          v{updateVersion} is out
-                        </span>
-                      </span>
-                      <span className="flex h-11 items-center gap-1.5 rounded-full bg-pink-foreground px-4 text-sm font-bold text-pink tabular-nums">
-                        {updateStatus === "downloading" ? (
+                  {/* Auto-update on: just a quiet status chip while it downloads / waits to install. */}
+                  <AnimatePresence initial={false}>
+                    {showUpdateChip && (
+                      <motion.button
+                        key="update-chip"
+                        type="button"
+                        initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                        transition={SPRING}
+                        onClick={updateStatus === "ready" ? installUpdate : undefined}
+                        disabled={updateStatus !== "ready"}
+                        className="flex h-9 shrink-0 cursor-pointer items-center gap-2 self-center rounded-full bg-card px-4 text-[13px] font-semibold tabular-nums disabled:cursor-default"
+                      >
+                        {updateStatus === "ready" ? (
                           <>
-                            <Loader2 className="size-4 animate-spin" />
-                            {Math.round(downloadProgress * 100)}%
+                            <Download className="size-3.5 text-pink" />
+                            v{updateVersion} ready · install
                           </>
                         ) : (
                           <>
-                            <Download className="size-4" />
-                            install
+                            <Loader2 className="size-3.5 animate-spin text-pink" />
+                            updating to v{updateVersion} · {Math.round(downloadProgress * 100)}%
                           </>
                         )}
-                      </span>
-                    </motion.button>
-                  )}
+                      </motion.button>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Auto-update off: a banner you can install from or dismiss for this version. */}
+                  <AnimatePresence initial={false}>
+                    {showUpdateBanner && (
+                      <motion.div
+                        key="update-banner"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={SPRING}
+                        className="shrink-0 overflow-hidden"
+                      >
+                        <div className="flex items-center gap-1 rounded-[20px] bg-pink py-2 pr-1.5 pl-[18px] text-pink-foreground">
+                          <span className="flex min-w-0 flex-1 flex-col">
+                            <span className="text-[15px] font-bold">update available</span>
+                            <span className="text-[13px] font-medium opacity-80">
+                              v{updateVersion} is out
+                            </span>
+                          </span>
+                          <motion.button
+                            type="button"
+                            onClick={installUpdate}
+                            whileTap={{ scale: 0.95 }}
+                            className="flex h-11 cursor-pointer items-center gap-1.5 rounded-full bg-pink-foreground px-4 text-sm font-bold text-pink tabular-nums"
+                          >
+                            {updateStatus === "downloading" ? (
+                              <>
+                                <Loader2 className="size-4 animate-spin" />
+                                {Math.round(downloadProgress * 100)}%
+                              </>
+                            ) : (
+                              <>
+                                <Download className="size-4" />
+                                install
+                              </>
+                            )}
+                          </motion.button>
+                          <button
+                            type="button"
+                            onClick={dismissUpdate}
+                            aria-label="Dismiss update"
+                            className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full transition-[background-color] hover:bg-pink-foreground/10"
+                          >
+                            <X className="size-5 stroke-[2.4]" />
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                   <motion.div
                     variants={RISE}
                     className="grid shrink-0 grid-cols-2 rounded-[24px] bg-card pt-4 pb-[18px]"
@@ -1638,7 +1720,11 @@ function App() {
 
           <motion.footer
             initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0, transition: { ...SOFT_SPRING, delay: 0.12 } }}
+            animate={
+              hasLaunched
+                ? { opacity: 1, y: 0, transition: { ...SOFT_SPRING, delay: 0.12 } }
+                : { opacity: 0, y: 16 }
+            }
             className="shrink-0 pt-4"
           >
             <Button

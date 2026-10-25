@@ -20,7 +20,9 @@
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
         <item name="windowSplashScreenBackground">@color/imposter_background</item>
-        <item name="windowSplashScreenIconBackgroundColor">@color/imposter_background</item>
+        <!-- Crisp animated vector instead of the upscaled launcher icon. -->
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_mask_animated</item>
+        <item name="windowSplashScreenAnimationDuration">600</item>
         <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>
 </resources>
