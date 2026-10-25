@@ -4,6 +4,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { NumberStepper } from "@/components/ui/number-stepper";
 import { RollingNumber } from "@/components/ui/rolling-number";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Page } from "@/components/ui/page";
 import { Sheet } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
@@ -580,6 +581,7 @@ function App() {
     }
   });
   const [showLicense, setShowLicense] = useState<boolean>(false);
+  const [showEndConfirm, setShowEndConfirm] = useState<boolean>(false);
   const autoDownloadStarted = useRef(false);
   const autoInstallPending = useRef(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
@@ -692,7 +694,9 @@ function App() {
   useEffect(
     () =>
       onBackButton(() => {
-        if (isNumberPickerOpen) {
+        if (showEndConfirm) {
+          setShowEndConfirm(false);
+        } else if (isNumberPickerOpen) {
           setIsNumberPickerOpen(false);
         } else if (showLicense) {
           setShowLicense(false);
@@ -703,9 +707,8 @@ function App() {
         } else if (showInfoModal) {
           setShowInfoModal(false);
         } else if (gameState === "pass" || gameState === "reveal") {
-          if (window.confirm("End this round and go back to setup?")) {
-            setGameState("setup");
-          }
+          haptic.tap();
+          setShowEndConfirm(true);
         } else if (gameState === "end") {
           setGameState("setup");
         } else {
@@ -713,6 +716,7 @@ function App() {
         }
       }),
     [
+      showEndConfirm,
       isNumberPickerOpen,
       showLicense,
       showSettings,
@@ -723,12 +727,22 @@ function App() {
   );
 
   useEffect(() => {
-    if (!showInfoModal && !showCategorySheet && !showSettings && !isNumberPickerOpen) {
+    if (
+      !showInfoModal &&
+      !showCategorySheet &&
+      !showSettings &&
+      !isNumberPickerOpen &&
+      !showEndConfirm
+    ) {
       return;
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        if (showEndConfirm) {
+          setShowEndConfirm(false);
+          return;
+        }
         setShowInfoModal(false);
         setShowCategorySheet(false);
         if (showLicense) {
@@ -742,7 +756,14 @@ function App() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [showInfoModal, showCategorySheet, showSettings, isNumberPickerOpen, showLicense]);
+  }, [
+    showInfoModal,
+    showCategorySheet,
+    showSettings,
+    isNumberPickerOpen,
+    showLicense,
+    showEndConfirm,
+  ]);
 
   useEffect(() => {
     try {
@@ -904,9 +925,14 @@ function App() {
   };
 
   const endGame = () => {
-    if (window.confirm("End this round and go back to setup?")) {
-      resetToSetup();
-    }
+    haptic.tap();
+    setShowEndConfirm(true);
+  };
+
+  const confirmEndGame = () => {
+    haptic.press();
+    setShowEndConfirm(false);
+    resetToSetup();
   };
 
   const pickSingleCategory = (key: string) => {
@@ -2358,6 +2384,16 @@ function App() {
             </motion.div>
           </motion.div>
         </Page>
+
+        <ConfirmDialog
+          open={showEndConfirm}
+          icon={<VenetianMask className="size-7" aria-hidden />}
+          title="end this round?"
+          confirmLabel="end round"
+          cancelLabel="keep playing"
+          onConfirm={confirmEndGame}
+          onCancel={() => setShowEndConfirm(false)}
+        />
 
         {/* License, readable in-app */}
         <Page
