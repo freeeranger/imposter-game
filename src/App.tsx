@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import licenseText from "../LICENSE?raw";
 import type { CSSProperties, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { NumberStepper } from "@/components/ui/number-stepper";
 import { RollingNumber } from "@/components/ui/rolling-number";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -24,6 +25,8 @@ import {
   Check,
   Loader2,
   Minus,
+  Pencil,
+  Trash2,
   SunMoon,
   Plus,
   ChevronRight,
@@ -79,7 +82,11 @@ type Category = {
   hard: string[];
   tag?: CategoryTag;
   hint?: string;
+  // Made by the players on this device; its words aren't split by difficulty.
+  custom?: boolean;
 };
+
+type CustomCategory = { id: string; name: string; words: string[] };
 
 const categoryFiles = import.meta.glob<{ default: CategoryFile }>(
   "./data/*.json",
@@ -99,6 +106,42 @@ const APP_VERSION = __APP_VERSION__;
 
 const CATEGORY_KEYS = Object.keys(CATEGORIES);
 const DEFAULT_CATEGORY = CATEGORY_KEYS[0] ?? "random";
+
+const CUSTOM_CATEGORIES_STORAGE_KEY = "imposter-game-custom-categories";
+const CUSTOM_KEY_PREFIX = "custom:";
+const MIN_CUSTOM_WORDS = 3;
+
+const loadCustomCategories = (): CustomCategory[] => {
+  try {
+    const parsed: unknown = JSON.parse(
+      window.localStorage.getItem(CUSTOM_CATEGORIES_STORAGE_KEY) ?? "[]",
+    );
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (item): item is CustomCategory =>
+        typeof item?.id === "string" &&
+        typeof item?.name === "string" &&
+        Array.isArray(item?.words),
+    );
+  } catch {
+    return [];
+  }
+};
+
+const toCategoryMap = (customCategories: CustomCategory[]) =>
+  Object.fromEntries(
+    customCategories.map((category): [string, Category] => [
+      CUSTOM_KEY_PREFIX + category.id,
+      { label: category.name, easy: category.words, hard: [], custom: true },
+    ]),
+  );
+
+// "a, b; c" or a pasted list (one per line) becomes separate words.
+const splitWords = (text: string) =>
+  text
+    .split(/[,;\n]+/)
+    .map((word) => word.trim())
+    .filter(Boolean);
 type Difficulty = "easy" | "hard" | "all";
 const DIFFICULTIES: Difficulty[] = ["easy", "hard", "all"];
 const DIFFICULTY_LABELS: Record<Difficulty, string> = {
@@ -283,6 +326,7 @@ const getCategoryWords = (
   category: Category,
   difficulty: Difficulty,
 ): string[] => {
+  if (category.custom) return [...category.easy, ...category.hard];
   if (difficulty === "easy") return category.easy;
   if (difficulty === "hard") return category.hard;
   return [...category.easy, ...category.hard];
@@ -318,7 +362,9 @@ const PRANK_PRESETS = [0, 5, 10, 15, 20, 25];
 // Layers that close on Android back, top-most first.
 type BackLayer =
   | "confirm"
+  | "deleteConfirm"
   | "picker"
+  | "editor"
   | "license"
   | "settings"
   | "category"
@@ -407,7 +453,8 @@ function loadSettings(): PersistedSettings {
     const category =
       parsed.selectedCategory === "random" ||
       (typeof parsed.selectedCategory === "string" &&
-        CATEGORIES[parsed.selectedCategory])
+        (CATEGORIES[parsed.selectedCategory] ||
+          toCategoryMap(loadCustomCategories())[parsed.selectedCategory]))
         ? parsed.selectedCategory
         : DEFAULT_SETTINGS.selectedCategory;
     return {
@@ -524,6 +571,11 @@ const TILE: Variants = {
   },
 };
 
+const rollChance = (percent: number) => Math.random() < percent / 100;
+
+const randomPlayerNumber = (playersCount: number) =>
+  Math.floor(Math.random() * playersCount) + 1;
+
 const pickRandom = <T,>(items: T[]): T =>
   items[Math.floor(Math.random() * items.length)];
 
@@ -582,6 +634,27 @@ function App() {
     return () => query.removeEventListener("change", handleChange);
   }, []);
   const [settings] = useState(loadSettings);
+  const [customCategories, setCustomCategories] =
+    useState<CustomCategory[]>(loadCustomCategories);
+  const allCategories = useMemo(
+    () => ({ ...CATEGORIES, ...toCategoryMap(customCategories) }),
+    [customCategories],
+  );
+  const customCategoryKeys = customCategories.map(
+    (category) => CUSTOM_KEY_PREFIX + category.id,
+  );
+  const allCategoryKeys = [...CATEGORY_KEYS, ...customCategoryKeys];
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        CUSTOM_CATEGORIES_STORAGE_KEY,
+        JSON.stringify(customCategories),
+      );
+    } catch {
+      // ignore storage write errors (e.g. private mode)
+    }
+  }, [customCategories]);
   const [gameState, setGameState] = useState<GameState>("setup");
   const [playersCount, setPlayersCount] = useState<number>(
     settings.playersCount,
@@ -609,6 +682,8 @@ function App() {
   const [randomPool, setRandomPool] = useState<Record<string, boolean>>(
     settings.randomPool,
   );
+  // Categories with no entry yet (e.g. newly made custom ones) count as included.
+  const isInPool = (key: string) => randomPool[key] !== false;
 
   const [playerAssignments, setPlayerAssignments] = useState<
     PlayerAssignment[]
@@ -647,6 +722,15 @@ function App() {
   });
   const [showEndConfirm, setShowEndConfirm] = useState<boolean>(false);
   const [showInstallHelp, setShowInstallHelp] = useState<boolean>(false);
+  // Custom category editor; the draft stays filled while the page animates away.
+  const [isEditorOpen, setIsEditorOpen] = useState<boolean>(false);
+  const [editorDraft, setEditorDraft] = useState<{
+    id: string | null;
+    name: string;
+    words: string[];
+  }>({ id: null, name: "", words: [] });
+  const [wordDraft, setWordDraft] = useState<string>("");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
   const autoDownloadStarted = useRef(false);
   const autoInstallPending = useRef(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
@@ -767,17 +851,21 @@ function App() {
   // back isn't intercepted at all, so Android plays its own predictive back-to-home.
   const topLayer: BackLayer | null = showEndConfirm
     ? "confirm"
-    : isNumberPickerOpen
-      ? "picker"
-      : showLicense
-        ? "license"
-        : showSettings
-          ? "settings"
-          : showCategorySheet
-            ? "category"
-            : showInfoModal
-              ? "info"
-              : null;
+    : showDeleteConfirm
+      ? "deleteConfirm"
+      : isNumberPickerOpen
+        ? "picker"
+        : isEditorOpen
+          ? "editor"
+          : showLicense
+            ? "license"
+            : showSettings
+              ? "settings"
+              : showCategorySheet
+                ? "category"
+                : showInfoModal
+                  ? "info"
+                  : null;
   const canGoBack = topLayer !== null || gameState !== "setup";
 
   useEffect(() => {
@@ -792,8 +880,12 @@ function App() {
     handleBackRef.current = () => {
       if (showEndConfirm) {
         setShowEndConfirm(false);
+      } else if (showDeleteConfirm) {
+        setShowDeleteConfirm(false);
       } else if (isNumberPickerOpen) {
         setIsNumberPickerOpen(false);
+      } else if (isEditorOpen) {
+        setIsEditorOpen(false);
       } else if (showLicense) {
         setShowLicense(false);
       } else if (showSettings) {
@@ -854,7 +946,8 @@ function App() {
       !showSettings &&
       !isNumberPickerOpen &&
       !showEndConfirm &&
-      !showInstallHelp
+      !showInstallHelp &&
+      !isEditorOpen
     ) {
       return;
     }
@@ -867,6 +960,14 @@ function App() {
         }
         if (showInstallHelp) {
           setShowInstallHelp(false);
+          return;
+        }
+        if (showDeleteConfirm) {
+          setShowDeleteConfirm(false);
+          return;
+        }
+        if (isEditorOpen) {
+          setIsEditorOpen(false);
           return;
         }
         setShowInfoModal(false);
@@ -890,6 +991,8 @@ function App() {
     showLicense,
     showEndConfirm,
     showInstallHelp,
+    isEditorOpen,
+    showDeleteConfirm,
   ]);
 
   useEffect(() => {
@@ -926,13 +1029,13 @@ function App() {
 
     const availableCategories =
       selectedCategory === "random"
-        ? CATEGORY_KEYS.filter(
+        ? allCategoryKeys.filter(
             (key) =>
-              randomPool[key] &&
-              getUniqueCategoryWords(CATEGORIES[key], selectedDifficulty)
+              isInPool(key) &&
+              getUniqueCategoryWords(allCategories[key], selectedDifficulty)
                 .length > 0,
           )
-        : CATEGORIES[selectedCategory]
+        : allCategories[selectedCategory]
           ? [selectedCategory]
           : [];
 
@@ -940,7 +1043,7 @@ function App() {
 
     const chosenCategory = pickRandom(availableCategories);
     const categoryWords = getUniqueCategoryWords(
-      CATEGORIES[chosenCategory],
+      allCategories[chosenCategory],
       selectedDifficulty,
     );
 
@@ -948,8 +1051,7 @@ function App() {
 
     let assignments: PlayerAssignment[];
 
-    const shouldUsePrank =
-      prankProbability > 0 && Math.random() < prankProbability / 100;
+    const shouldUsePrank = prankProbability > 0 && rollChance(prankProbability);
 
     if (shouldUsePrank) {
       const availablePranks: PrankMode[] = ["everyone-imposter", "no-imposter"];
@@ -1014,7 +1116,7 @@ function App() {
     setPrankActive(shouldUsePrank);
 
     if (randomizeStarter) {
-      setStartingPlayer(Math.floor(Math.random() * playersCount) + 1);
+      setStartingPlayer(randomPlayerNumber(playersCount));
     } else {
       setStartingPlayer(null);
     }
@@ -1131,6 +1233,77 @@ function App() {
     }
   };
 
+  const openCategoryEditor = (category?: CustomCategory) => {
+    haptic.tap();
+    setEditorDraft(
+      category
+        ? { id: category.id, name: category.name, words: [...category.words] }
+        : { id: null, name: "", words: [] },
+    );
+    setWordDraft("");
+    setIsEditorOpen(true);
+  };
+
+  const addDraftWords = (text: string) => {
+    const words = splitWords(text);
+    if (words.length === 0) return;
+    haptic.tap();
+    setEditorDraft((draft) => {
+      const seen = new Set(draft.words.map((word) => word.toLowerCase()));
+      const nextWords = [...draft.words];
+      for (const word of words) {
+        if (seen.has(word.toLowerCase())) continue;
+        seen.add(word.toLowerCase());
+        nextWords.push(word);
+      }
+      return { ...draft, words: nextWords };
+    });
+  };
+
+  const draftName = editorDraft.name.trim();
+  const missingWords = Math.max(0, MIN_CUSTOM_WORDS - editorDraft.words.length);
+  const canSaveDraft = draftName.length > 0 && missingWords === 0;
+
+  const saveCategoryDraft = () => {
+    if (!canSaveDraft) return;
+    haptic.success();
+    const id = editorDraft.id ?? Date.now().toString(36);
+    const saved: CustomCategory = {
+      id,
+      name: draftName,
+      words: editorDraft.words,
+    };
+    setCustomCategories((categories) =>
+      editorDraft.id
+        ? categories.map((category) => (category.id === id ? saved : category))
+        : [...categories, saved],
+    );
+    if (!editorDraft.id) {
+      const key = CUSTOM_KEY_PREFIX + id;
+      setRandomPool((pool) => ({ ...pool, [key]: true }));
+      // A brand-new category is probably the one you want to play.
+      if (selectedCategory !== "random") {
+        setSelectedCategory(key);
+        setLastSingleCategory(key);
+      }
+    }
+    setIsEditorOpen(false);
+  };
+
+  const deleteCategoryDraft = () => {
+    const id = editorDraft.id;
+    if (!id) return;
+    haptic.press();
+    const key = CUSTOM_KEY_PREFIX + id;
+    setCustomCategories((categories) =>
+      categories.filter((category) => category.id !== id),
+    );
+    if (selectedCategory === key) setSelectedCategory(DEFAULT_CATEGORY);
+    if (lastSingleCategory === key) setLastSingleCategory(DEFAULT_CATEGORY);
+    setShowDeleteConfirm(false);
+    setIsEditorOpen(false);
+  };
+
   const applyPlayersCount = (value: number) => {
     setPlayersCount(value);
     if (impostersCount >= value) {
@@ -1155,18 +1328,18 @@ function App() {
     setRandomPool({ ...DEFAULT_SETTINGS.randomPool });
   };
 
-  const hasCategories = CATEGORY_KEYS.length > 0;
+  const hasCategories = allCategoryKeys.length > 0;
   const isStartDisabled =
     !hasCategories ||
     (selectedCategory === "random" &&
-      !CATEGORY_KEYS.some(
+      !allCategoryKeys.some(
         (key) =>
-          randomPool[key] &&
-          getCategoryWords(CATEGORIES[key], selectedDifficulty).length > 0,
+          isInPool(key) &&
+          getCategoryWords(allCategories[key], selectedDifficulty).length > 0,
       )) ||
     (selectedCategory !== "random" &&
-      (!CATEGORIES[selectedCategory] ||
-        getCategoryWords(CATEGORIES[selectedCategory], selectedDifficulty)
+      (!allCategories[selectedCategory] ||
+        getCategoryWords(allCategories[selectedCategory], selectedDifficulty)
           .length === 0)) ||
     impostersCount >= playersCount;
 
@@ -1224,8 +1397,8 @@ function App() {
   const isRandomMix = selectedCategory === "random";
   const selectedCategoryInfo = isRandomMix
     ? undefined
-    : CATEGORIES[selectedCategory];
-  const randomPoolCount = CATEGORY_KEYS.filter((key) => randomPool[key]).length;
+    : allCategories[selectedCategory];
+  const randomPoolCount = allCategoryKeys.filter(isInPool).length;
   const numberPicker = {
     players: {
       title: "players",
@@ -1261,8 +1434,148 @@ function App() {
   const selectedWordCount = selectedCategoryInfo
     ? getUniqueCategoryWords(selectedCategoryInfo, selectedDifficulty).length
     : 0;
-  const activeCategoryInfo = CATEGORIES[activeCategory];
+  const activeCategoryInfo = allCategories[activeCategory];
   const canRevealFellows = impostersCount >= 2;
+
+  const renderCategoryTile = (key: string) => {
+    const category = allCategories[key];
+
+    if (!isRandomMix) {
+      const isSelected = key === selectedCategory;
+      const customCategory = category.custom
+        ? customCategories.find((item) => CUSTOM_KEY_PREFIX + item.id === key)
+        : undefined;
+      const tile = (
+        <motion.button
+          key={key}
+          variants={TILE}
+          whileTap={{ scale: 0.96 }}
+          type="button"
+          aria-pressed={isSelected}
+          onClick={() => {
+            haptic.tap();
+            pickSingleCategory(key);
+          }}
+          className={cn(
+            "relative isolate flex h-[54px] w-full cursor-pointer flex-col items-start justify-center gap-0.5 rounded-2xl bg-secondary px-3.5 text-left transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
+            customCategory && "pr-11",
+            isSelected
+              ? "text-primary-foreground"
+              : "text-secondary-foreground",
+          )}
+        >
+          {/* Pops in place: a pill gliding across a 2-column grid would cut over other tiles. */}
+          <AnimatePresence initial={false}>
+            {isSelected && (
+              <motion.span
+                initial={{ opacity: 0, scale: 0.85 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={SPRING}
+                className="absolute inset-0 -z-10 rounded-2xl bg-primary"
+              />
+            )}
+          </AnimatePresence>
+          <span
+            className={cn(
+              "max-w-full truncate text-[15px] leading-tight lowercase",
+              isSelected ? "font-bold" : "font-semibold",
+            )}
+          >
+            {category.label}
+          </span>
+          <span
+            className={cn(
+              "flex items-center gap-1.5 text-xs whitespace-nowrap transition-colors duration-200",
+              isSelected
+                ? "text-primary-foreground/70"
+                : "text-muted-foreground/80",
+            )}
+          >
+            {getUniqueCategoryWords(category, selectedDifficulty).length} words
+            {category.tag && (
+              <CategorySticker tag={category.tag} onPrimary={isSelected} />
+            )}
+          </span>
+        </motion.button>
+      );
+      if (!customCategory) return tile;
+      return (
+        <div key={key} className="relative">
+          {tile}
+          <button
+            type="button"
+            aria-label={`Edit ${category.label}`}
+            onClick={() => openCategoryEditor(customCategory)}
+            className={cn(
+              "absolute top-1/2 right-1 flex size-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
+              isSelected
+                ? "text-primary-foreground/80 hover:text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <Pencil className="size-4" />
+          </button>
+        </div>
+      );
+    }
+
+    const isIncluded = isInPool(key);
+    return (
+      <motion.button
+        key={key}
+        variants={TILE}
+        whileTap={{ scale: 0.96 }}
+        type="button"
+        role="checkbox"
+        aria-checked={isIncluded}
+        onClick={() => {
+          haptic.tap();
+          setRandomPool((prev) => ({
+            ...prev,
+            [key]: !isIncluded,
+          }));
+        }}
+        className={cn(
+          "relative flex h-[54px] cursor-pointer flex-col items-start justify-center gap-0.5 rounded-2xl border-[1.5px] px-3.5 text-left transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
+          isIncluded
+            ? "border-transparent bg-secondary text-secondary-foreground"
+            : "border-border bg-transparent text-muted-foreground",
+        )}
+      >
+        <span
+          className={cn(
+            "max-w-[calc(100%-1.75rem)] truncate text-[15px] leading-tight lowercase",
+            isIncluded ? "font-semibold" : "font-medium line-through",
+          )}
+        >
+          {category.label}
+        </span>
+        <span className="flex items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground/80">
+          {getUniqueCategoryWords(category, selectedDifficulty).length} words
+          {category.tag && <CategorySticker tag={category.tag} />}
+        </span>
+        <span
+          className="absolute top-2 right-2.5 flex size-5 items-center justify-center rounded-full border-2 border-muted-foreground/60"
+          aria-hidden="true"
+        >
+          <AnimatePresence initial={false}>
+            {isIncluded && (
+              <motion.span
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0 }}
+                transition={{ type: "spring", stiffness: 800, damping: 32 }}
+                className="absolute -inset-0.5 flex items-center justify-center rounded-full bg-primary text-primary-foreground"
+              >
+                <Check className="size-3 stroke-[3.5]" />
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </span>
+      </motion.button>
+    );
+  };
 
   return (
     <PredictiveBackContext.Provider value={predictiveBackValues}>
@@ -1512,7 +1825,7 @@ function App() {
                                   <>
                                     picks from{" "}
                                     <RollingNumber value={randomPoolCount} /> of{" "}
-                                    {CATEGORY_KEYS.length}
+                                    {allCategoryKeys.length}
                                   </>
                                 ) : (
                                   <>
@@ -1528,70 +1841,91 @@ function App() {
                       </motion.button>
                     </motion.div>
 
-                    <motion.div
-                      variants={RISE}
-                      className="flex shrink-0 flex-col gap-2.5"
-                    >
-                      <div className="flex items-baseline justify-between gap-3 px-1">
-                        <span
-                          id="difficulty-label"
-                          className="text-[13px] font-semibold text-muted-foreground"
-                        >
-                          Difficulty
-                        </span>
-                        <span className="relative h-5 min-w-0 flex-1 overflow-hidden text-right">
-                          <AnimatePresence mode="popLayout" initial={false}>
-                            <motion.span
-                              key={selectedDifficulty}
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -10 }}
-                              transition={SPRING}
-                              className="block truncate text-[13px] text-muted-foreground/80"
-                            >
-                              {DIFFICULTY_DESCRIPTIONS[selectedDifficulty]}
-                            </motion.span>
-                          </AnimatePresence>
-                        </span>
-                      </div>
-                      <div
-                        role="radiogroup"
-                        aria-labelledby="difficulty-label"
-                        className="grid grid-cols-3 rounded-full bg-card p-1"
-                      >
-                        {DIFFICULTIES.map((difficulty) => {
-                          const isSelected = difficulty === selectedDifficulty;
-                          return (
-                            <button
-                              key={difficulty}
-                              type="button"
-                              role="radio"
-                              aria-checked={isSelected}
-                              onClick={() => {
-                                haptic.tap();
-                                setSelectedDifficulty(difficulty);
-                              }}
-                              className={cn(
-                                "relative h-[42px] cursor-pointer rounded-full text-[15px] transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
-                                isSelected
-                                  ? "font-bold text-primary-foreground"
-                                  : "font-semibold text-foreground",
-                              )}
-                            >
-                              {isSelected && (
-                                <motion.span
-                                  layoutId="difficulty-pill"
-                                  transition={SPRING}
-                                  className="absolute inset-0 rounded-full bg-primary"
-                                />
-                              )}
-                              <span className="relative">
-                                {DIFFICULTY_LABELS[difficulty]}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
+                    {/* Custom categories aren't split into easy/hard, so difficulty folds away.
+                      -mt-5 cancels the column gap; the inner pt-5 brings it back while shown. */}
+                    <motion.div variants={RISE} className="-mt-5 shrink-0">
+                      <AnimatePresence initial={false}>
+                        {!selectedCategoryInfo?.custom && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={SPRING}
+                            className="overflow-hidden"
+                          >
+                            <div className="flex flex-col gap-2.5 pt-5">
+                              <div className="flex items-baseline justify-between gap-3 px-1">
+                                <span
+                                  id="difficulty-label"
+                                  className="text-[13px] font-semibold text-muted-foreground"
+                                >
+                                  Difficulty
+                                </span>
+                                <span className="relative h-5 min-w-0 flex-1 overflow-hidden text-right">
+                                  <AnimatePresence
+                                    mode="popLayout"
+                                    initial={false}
+                                  >
+                                    <motion.span
+                                      key={selectedDifficulty}
+                                      initial={{ opacity: 0, y: 10 }}
+                                      animate={{ opacity: 1, y: 0 }}
+                                      exit={{ opacity: 0, y: -10 }}
+                                      transition={SPRING}
+                                      className="block truncate text-[13px] text-muted-foreground/80"
+                                    >
+                                      {
+                                        DIFFICULTY_DESCRIPTIONS[
+                                          selectedDifficulty
+                                        ]
+                                      }
+                                    </motion.span>
+                                  </AnimatePresence>
+                                </span>
+                              </div>
+                              <div
+                                role="radiogroup"
+                                aria-labelledby="difficulty-label"
+                                className="grid grid-cols-3 rounded-full bg-card p-1"
+                              >
+                                {DIFFICULTIES.map((difficulty) => {
+                                  const isSelected =
+                                    difficulty === selectedDifficulty;
+                                  return (
+                                    <button
+                                      key={difficulty}
+                                      type="button"
+                                      role="radio"
+                                      aria-checked={isSelected}
+                                      onClick={() => {
+                                        haptic.tap();
+                                        setSelectedDifficulty(difficulty);
+                                      }}
+                                      className={cn(
+                                        "relative h-[42px] cursor-pointer rounded-full text-[15px] transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
+                                        isSelected
+                                          ? "font-bold text-primary-foreground"
+                                          : "font-semibold text-foreground",
+                                      )}
+                                    >
+                                      {isSelected && (
+                                        <motion.span
+                                          layoutId="difficulty-pill"
+                                          transition={SPRING}
+                                          className="absolute inset-0 rounded-full bg-primary"
+                                        />
+                                      )}
+                                      <span className="relative">
+                                        {DIFFICULTY_LABELS[difficulty]}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </motion.div>
 
                     <motion.div
@@ -1951,7 +2285,7 @@ function App() {
                       picks from
                       <span className="flex items-baseline gap-1 font-bold text-foreground">
                         <RollingNumber value={randomPoolCount} /> of{" "}
-                        {CATEGORY_KEYS.length}
+                        {allCategoryKeys.length}
                       </span>
                     </span>
                     <div className="flex gap-1">
@@ -1962,7 +2296,7 @@ function App() {
                         onClick={() =>
                           setRandomPool(
                             Object.fromEntries(
-                              CATEGORY_KEYS.map((k) => [k, true]),
+                              allCategoryKeys.map((k) => [k, true]),
                             ),
                           )
                         }
@@ -1976,7 +2310,7 @@ function App() {
                         onClick={() =>
                           setRandomPool(
                             Object.fromEntries(
-                              CATEGORY_KEYS.map((k) => [k, false]),
+                              allCategoryKeys.map((k) => [k, false]),
                             ),
                           )
                         }
@@ -2001,140 +2335,26 @@ function App() {
                 animate="animate"
                 className="grid grid-cols-2 gap-1.5"
               >
-                {CATEGORY_KEYS.map((key) => {
-                  const category = CATEGORIES[key];
-
-                  if (!isRandomMix) {
-                    const isSelected = key === selectedCategory;
-                    return (
-                      <motion.button
-                        key={key}
-                        variants={TILE}
-                        whileTap={{ scale: 0.96 }}
-                        type="button"
-                        aria-pressed={isSelected}
-                        onClick={() => {
-                          haptic.tap();
-                          pickSingleCategory(key);
-                        }}
-                        className={cn(
-                          "relative isolate flex h-[54px] cursor-pointer flex-col items-start justify-center gap-0.5 rounded-2xl bg-secondary px-3.5 text-left transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
-                          isSelected
-                            ? "text-primary-foreground"
-                            : "text-secondary-foreground",
-                        )}
-                      >
-                        {/* Pops in place: a pill gliding across a 2-column grid would cut over other tiles. */}
-                        <AnimatePresence initial={false}>
-                          {isSelected && (
-                            <motion.span
-                              initial={{ opacity: 0, scale: 0.85 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              exit={{ opacity: 0, scale: 0.95 }}
-                              transition={SPRING}
-                              className="absolute inset-0 -z-10 rounded-2xl bg-primary"
-                            />
-                          )}
-                        </AnimatePresence>
-                        <span
-                          className={cn(
-                            "max-w-full truncate text-[15px] leading-tight lowercase",
-                            isSelected ? "font-bold" : "font-semibold",
-                          )}
-                        >
-                          {category.label}
-                        </span>
-                        <span
-                          className={cn(
-                            "flex items-center gap-1.5 text-xs whitespace-nowrap transition-colors duration-200",
-                            isSelected
-                              ? "text-primary-foreground/70"
-                              : "text-muted-foreground/80",
-                          )}
-                        >
-                          {
-                            getUniqueCategoryWords(category, selectedDifficulty)
-                              .length
-                          }{" "}
-                          words
-                          {category.tag && (
-                            <CategorySticker
-                              tag={category.tag}
-                              onPrimary={isSelected}
-                            />
-                          )}
-                        </span>
-                      </motion.button>
-                    );
-                  }
-
-                  const isIncluded = !!randomPool[key];
-                  return (
-                    <motion.button
-                      key={key}
-                      variants={TILE}
-                      whileTap={{ scale: 0.96 }}
-                      type="button"
-                      role="checkbox"
-                      aria-checked={isIncluded}
-                      onClick={() => {
-                        haptic.tap();
-                        setRandomPool((prev) => ({
-                          ...prev,
-                          [key]: !isIncluded,
-                        }));
-                      }}
-                      className={cn(
-                        "relative flex h-[54px] cursor-pointer flex-col items-start justify-center gap-0.5 rounded-2xl border-[1.5px] px-3.5 text-left transition-colors duration-200 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
-                        isIncluded
-                          ? "border-transparent bg-secondary text-secondary-foreground"
-                          : "border-border bg-transparent text-muted-foreground",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "max-w-[calc(100%-1.75rem)] truncate text-[15px] leading-tight lowercase",
-                          isIncluded
-                            ? "font-semibold"
-                            : "font-medium line-through",
-                        )}
-                      >
-                        {category.label}
-                      </span>
-                      <span className="flex items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground/80">
-                        {
-                          getUniqueCategoryWords(category, selectedDifficulty)
-                            .length
-                        }{" "}
-                        words
-                        {category.tag && <CategorySticker tag={category.tag} />}
-                      </span>
-                      <span
-                        className="absolute top-2 right-2.5 flex size-5 items-center justify-center rounded-full border-2 border-muted-foreground/60"
-                        aria-hidden="true"
-                      >
-                        <AnimatePresence initial={false}>
-                          {isIncluded && (
-                            <motion.span
-                              initial={{ scale: 0 }}
-                              animate={{ scale: 1 }}
-                              exit={{ scale: 0 }}
-                              transition={{
-                                type: "spring",
-                                stiffness: 800,
-                                damping: 32,
-                              }}
-                              className="absolute -inset-0.5 flex items-center justify-center rounded-full bg-primary text-primary-foreground"
-                            >
-                              <Check className="size-3 stroke-[3.5]" />
-                            </motion.span>
-                          )}
-                        </AnimatePresence>
-                      </span>
-                    </motion.button>
-                  );
-                })}
+                {CATEGORY_KEYS.map(renderCategoryTile)}
               </motion.div>
+
+              <div className="mt-5 flex flex-col gap-2.5 pb-1">
+                <span className="px-1 text-[13px] font-semibold text-muted-foreground">
+                  Your categories
+                </span>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {customCategoryKeys.map(renderCategoryTile)}
+                  <motion.button
+                    type="button"
+                    whileTap={{ scale: 0.96 }}
+                    onClick={() => openCategoryEditor()}
+                    className="flex h-[54px] cursor-pointer items-center gap-2 rounded-2xl border-[1.5px] border-dashed border-pink/70 px-3.5 text-left text-[15px] font-semibold text-pink outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60"
+                  >
+                    <Plus className="size-4 stroke-[2.6]" />
+                    new category
+                  </motion.button>
+                </div>
+              </div>
             </div>
 
             <Button
@@ -2145,6 +2365,162 @@ function App() {
               done
             </Button>
           </Sheet>
+
+          {/* Custom category editor */}
+          <Page
+            open={isEditorOpen}
+            predictive={backTarget === "editor"}
+            onClose={() => setIsEditorOpen(false)}
+            title={editorDraft.id ? "edit category" : "new category"}
+            stacked
+          >
+            <div className="flex flex-col gap-6 pb-2">
+              <section className="flex flex-col gap-2.5">
+                <label
+                  htmlFor="custom-category-name"
+                  className="px-1 text-[13px] font-semibold text-muted-foreground"
+                >
+                  Name
+                </label>
+                <Input
+                  id="custom-category-name"
+                  value={editorDraft.name}
+                  maxLength={28}
+                  autoComplete="off"
+                  placeholder="e.g. inside jokes"
+                  onChange={(event) =>
+                    setEditorDraft((draft) => ({
+                      ...draft,
+                      name: event.target.value,
+                    }))
+                  }
+                  className="h-12 bg-card text-base"
+                />
+              </section>
+
+              <section className="flex flex-col gap-2.5">
+                <div className="flex items-baseline justify-between px-1">
+                  <label
+                    htmlFor="custom-category-word"
+                    className="text-[13px] font-semibold text-muted-foreground"
+                  >
+                    Words
+                  </label>
+                  <span className="text-[13px] text-muted-foreground tabular-nums">
+                    <RollingNumber value={editorDraft.words.length} />
+                  </span>
+                </div>
+                <form
+                  className="flex gap-2"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    addDraftWords(wordDraft);
+                    setWordDraft("");
+                  }}
+                >
+                  <Input
+                    id="custom-category-word"
+                    value={wordDraft}
+                    autoComplete="off"
+                    enterKeyHint="enter"
+                    placeholder="add a word, or paste a list"
+                    onChange={(event) => setWordDraft(event.target.value)}
+                    onPaste={(event) => {
+                      const pasted = event.clipboardData.getData("text");
+                      if (splitWords(pasted).length > 1) {
+                        event.preventDefault();
+                        addDraftWords(pasted);
+                      }
+                    }}
+                    className="h-12 flex-1 bg-card text-base"
+                  />
+                  <Button
+                    type="submit"
+                    size="icon"
+                    className="size-12 shrink-0"
+                    aria-label="Add word"
+                    disabled={!wordDraft.trim()}
+                  >
+                    <Plus className="size-5 stroke-[2.6]" />
+                  </Button>
+                </form>
+                <ul className="flex flex-wrap gap-2 pt-1">
+                  <AnimatePresence initial={false} mode="popLayout">
+                    {editorDraft.words.map((word) => (
+                      <motion.li
+                        key={word}
+                        layout
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        transition={SPRING}
+                        className="flex h-10 items-center gap-0.5 rounded-full bg-secondary pr-1 pl-3.5 text-[15px] font-medium"
+                      >
+                        <span>{word}</span>
+                        <button
+                          type="button"
+                          aria-label={`Remove ${word}`}
+                          onClick={() => {
+                            haptic.tap();
+                            setEditorDraft((draft) => ({
+                              ...draft,
+                              words: draft.words.filter(
+                                (item) => item !== word,
+                              ),
+                            }));
+                          }}
+                          className="flex size-8 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                          <X className="size-4" />
+                        </button>
+                      </motion.li>
+                    ))}
+                  </AnimatePresence>
+                </ul>
+              </section>
+
+              <div className="flex flex-col gap-1">
+                <Button
+                  size="lg"
+                  className="h-14 w-full text-[17px]"
+                  disabled={!canSaveDraft}
+                  onClick={saveCategoryDraft}
+                >
+                  {draftName.length === 0
+                    ? "give it a name"
+                    : missingWords > 0
+                      ? `add ${missingWords} more word${missingWords === 1 ? "" : "s"}`
+                      : editorDraft.id
+                        ? "save changes"
+                        : "save category"}
+                </Button>
+                {editorDraft.id && (
+                  <Button
+                    variant="ghost"
+                    className="h-11 text-pink hover:text-pink"
+                    onClick={() => {
+                      haptic.tap();
+                      setShowDeleteConfirm(true);
+                    }}
+                  >
+                    <Trash2 className="size-4" />
+                    delete category
+                  </Button>
+                )}
+              </div>
+            </div>
+          </Page>
+
+          <ConfirmDialog
+            open={showDeleteConfirm}
+            predictive={backTarget === "deleteConfirm"}
+            icon={<Trash2 className="size-7" aria-hidden />}
+            title="delete this category?"
+            confirmLabel="delete"
+            cancelLabel="keep it"
+            onConfirm={deleteCategoryDraft}
+            onCancel={() => setShowDeleteConfirm(false)}
+          />
 
           {/* How to play */}
           <Sheet
