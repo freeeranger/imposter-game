@@ -66,7 +66,8 @@ function Page({ open, onClose, title, children, stacked = false }: PageProps) {
                 {title}
               </h1>
             </header>
-            <div className="-mx-5 min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-6 pb-2">
+            {/* relative so popLayout animations inside measure against the scrolled content */}
+            <div className="relative -mx-5 min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-6 pb-2">
               {children}
             </div>
           </div>

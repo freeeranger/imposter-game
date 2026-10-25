@@ -2198,7 +2198,8 @@ function App() {
                         void checkForUpdates();
                       }
                     }}
-                    className="flex min-h-[54px] cursor-pointer items-center justify-between gap-3 text-left"
+                    // relative: popLayout positions the outgoing status against this row, not the scrolled page.
+                    className="relative flex min-h-[54px] cursor-pointer items-center justify-between gap-3 text-left"
                   >
                     <span className="text-[15px] font-medium">Updates</span>
                     <AnimatePresence mode="popLayout" initial={false}>
