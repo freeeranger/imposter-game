@@ -70,6 +70,7 @@ import {
   setKeepAwake,
   setSystemBarsTheme,
 } from "@/lib/native";
+import { useKeyboard } from "@/lib/keyboard";
 import { PredictiveBackContext } from "@/lib/predictive-back";
 import { applyPendingWebUpdate } from "@/lib/pwa";
 import { cn } from "@/lib/utils";
@@ -862,6 +863,10 @@ function App() {
     words: string[];
   }>({ id: null, name: "", words: [] });
   const [wordDraft, setWordDraft] = useState<string>("");
+  const [isWordInputFocused, setIsWordInputFocused] = useState<boolean>(false);
+  const keyboard = useKeyboard();
+  const editorListEnd = useRef<HTMLDivElement>(null);
+  const scrollToNewWord = useRef(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState<boolean>(false);
   const autoDownloadStarted = useRef(false);
@@ -1470,7 +1475,20 @@ function App() {
       }
       return { ...draft, words: nextWords };
     });
+    scrollToNewWord.current = true;
   };
+
+  // Keep the newest word in view just above the docked input, also when the keyboard
+  // opens and the list gets shorter.
+  useEffect(() => {
+    if (!scrollToNewWord.current) return;
+    scrollToNewWord.current = false;
+    editorListEnd.current?.scrollIntoView({ block: "end", behavior: "smooth" });
+  }, [editorDraft.words.length]);
+  const isTypingWords = keyboard.open && isWordInputFocused;
+  useEffect(() => {
+    if (isTypingWords) editorListEnd.current?.scrollIntoView({ block: "end" });
+  }, [isTypingWords]);
 
   const saveCategoryDraft = () => {
     if (!canSaveDraft) return;
@@ -2592,50 +2610,16 @@ function App() {
             </Button>
           </Sheet>
 
-          {/* Custom category editor */}
+          {/* Custom category editor: a numbered list of words, typed into an input docked
+              at the bottom so it sits right above the keyboard. */}
           <Page
             open={isEditorOpen}
             predictive={backTarget === "editor"}
             onClose={requestCloseEditor}
             title={editorDraft.id ? "edit category" : "new category"}
             stacked
-          >
-            <div className="flex flex-col gap-6 pb-2">
-              <section className="flex flex-col gap-2.5">
-                <label
-                  htmlFor="custom-category-name"
-                  className="px-1 text-[13px] font-semibold text-muted-foreground"
-                >
-                  Name
-                </label>
-                <Input
-                  id="custom-category-name"
-                  value={editorDraft.name}
-                  maxLength={28}
-                  autoComplete="off"
-                  placeholder="e.g. inside jokes"
-                  onChange={(event) =>
-                    setEditorDraft((draft) => ({
-                      ...draft,
-                      name: event.target.value,
-                    }))
-                  }
-                  className="h-12 bg-card text-base"
-                />
-              </section>
-
-              <section className="flex flex-col gap-2.5">
-                <div className="flex items-baseline justify-between px-1">
-                  <label
-                    htmlFor="custom-category-word"
-                    className="text-[13px] font-semibold text-muted-foreground"
-                  >
-                    Words
-                  </label>
-                  <span className="text-[13px] text-muted-foreground tabular-nums">
-                    <RollingNumber value={editorDraft.words.length} />
-                  </span>
-                </div>
+            footer={
+              <div className="flex flex-col gap-3">
                 <form
                   className="flex gap-2"
                   onSubmit={(event) => {
@@ -2646,11 +2630,14 @@ function App() {
                 >
                   <Input
                     id="custom-category-word"
+                    aria-label="Add a word"
                     value={wordDraft}
                     autoComplete="off"
                     enterKeyHint="enter"
                     placeholder="add a word, or paste a list"
                     onChange={(event) => setWordDraft(event.target.value)}
+                    onFocus={() => setIsWordInputFocused(true)}
+                    onBlur={() => setIsWordInputFocused(false)}
                     onPaste={(event) => {
                       const pasted = splitWords(
                         event.clipboardData.getData("text"),
@@ -2668,76 +2655,130 @@ function App() {
                     className="size-12 shrink-0"
                     aria-label="Add word"
                     disabled={!wordDraft.trim()}
+                    // Keep focus (and the keyboard) in the input while adding words.
+                    onPointerDown={(event) => event.preventDefault()}
                   >
                     <Plus className="size-5 stroke-[2.6]" />
                   </Button>
                 </form>
-                <ul className="flex flex-wrap gap-2 pt-1">
-                  <AnimatePresence initial={false} mode="popLayout">
-                    {editorDraft.words.map((word) => (
-                      <motion.li
-                        key={word}
-                        layout
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.8 }}
-                        transition={SPRING}
-                        className="flex min-h-10 max-w-full items-center gap-0.5 rounded-[20px] bg-secondary pr-1 pl-3.5 text-[15px] font-medium"
-                      >
-                        <span className="min-w-0 py-2 leading-tight [overflow-wrap:anywhere]">
-                          {word}
-                        </span>
-                        <button
-                          type="button"
-                          aria-label={`Remove ${word}`}
-                          onClick={() => {
-                            haptic.tap();
-                            setEditorDraft((draft) => ({
-                              ...draft,
-                              words: draft.words.filter(
-                                (item) => item !== word,
-                              ),
-                            }));
-                          }}
-                          className="flex size-8 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
-                        >
-                          <X className="size-4" />
-                        </button>
-                      </motion.li>
-                    ))}
-                  </AnimatePresence>
-                </ul>
-              </section>
-
-              <div className="flex flex-col gap-1">
-                <Button
-                  size="lg"
-                  className="h-14 w-full text-[17px]"
-                  disabled={!canSaveDraft}
-                  onClick={saveCategoryDraft}
-                >
-                  {draftName.length === 0
-                    ? "give it a name"
-                    : missingWords > 0
-                      ? `add ${missingWords} more word${missingWords === 1 ? "" : "s"}`
-                      : editorDraft.id
-                        ? "save changes"
-                        : "save category"}
-                </Button>
-                {editorDraft.id && (
+                {/* While typing words the keyboard is up; save waits until it goes down. */}
+                {!isTypingWords && (
                   <Button
-                    variant="ghost"
-                    className="h-11 text-pink hover:text-pink"
-                    onClick={() => {
-                      haptic.tap();
-                      setShowDeleteConfirm(true);
-                    }}
+                    size="lg"
+                    className="h-14 w-full text-[17px]"
+                    disabled={!canSaveDraft}
+                    onClick={saveCategoryDraft}
                   >
-                    <Trash2 className="size-4" />
-                    delete category
+                    {draftName.length === 0
+                      ? "give it a name"
+                      : missingWords > 0
+                        ? `add ${missingWords} more word${missingWords === 1 ? "" : "s"}`
+                        : editorDraft.id
+                          ? "save changes"
+                          : "save category"}
                   </Button>
                 )}
               </div>
+            }
+          >
+            <div className="flex flex-col gap-6 pb-2">
+              <section className="flex flex-col gap-1">
+                <label
+                  htmlFor="custom-category-name"
+                  className="px-1 text-[13px] font-semibold text-muted-foreground"
+                >
+                  Name
+                </label>
+                <input
+                  id="custom-category-name"
+                  value={editorDraft.name}
+                  maxLength={28}
+                  autoComplete="off"
+                  enterKeyHint="done"
+                  placeholder="give it a name"
+                  onChange={(event) =>
+                    setEditorDraft((draft) => ({
+                      ...draft,
+                      name: event.target.value,
+                    }))
+                  }
+                  className="w-full border-b-2 border-border bg-transparent px-1 pt-1 pb-2 font-display text-[26px] leading-tight font-extrabold tracking-[-0.03em] transition-colors outline-none placeholder:text-muted-foreground/50 focus:border-primary"
+                />
+              </section>
+
+              <section className="flex flex-col gap-2.5">
+                <div className="flex items-baseline justify-between px-1">
+                  <span className="text-[13px] font-semibold text-muted-foreground">
+                    Words
+                  </span>
+                  <span className="text-[13px] text-muted-foreground tabular-nums">
+                    <RollingNumber value={editorDraft.words.length} />
+                  </span>
+                </div>
+                {editorDraft.words.length === 0 ? (
+                  <p className="rounded-[24px] bg-card px-[18px] py-4 text-[15px] text-muted-foreground">
+                    No words yet. Type them below, one at a time, or paste a
+                    whole list. You need at least {MIN_CUSTOM_WORDS}.
+                  </p>
+                ) : (
+                  <ol className="flex flex-col rounded-[24px] bg-card pr-1.5 pl-[18px]">
+                    <AnimatePresence initial={false}>
+                      {editorDraft.words.map((word, index) => (
+                        <motion.li
+                          key={word}
+                          layout="position"
+                          // Enters at full height so the list can scroll to it right away.
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={SPRING}
+                          className="overflow-hidden border-b border-border/70 last:border-b-0"
+                        >
+                          <div className="flex min-h-[52px] items-center gap-3 py-1">
+                            <span className="w-5 shrink-0 text-[13px] text-muted-foreground tabular-nums">
+                              {index + 1}
+                            </span>
+                            <span className="min-w-0 flex-1 text-base leading-snug [overflow-wrap:anywhere]">
+                              {word}
+                            </span>
+                            <button
+                              type="button"
+                              aria-label={`Remove ${word}`}
+                              onClick={() => {
+                                haptic.tap();
+                                setEditorDraft((draft) => ({
+                                  ...draft,
+                                  words: draft.words.filter(
+                                    (item) => item !== word,
+                                  ),
+                                }));
+                              }}
+                              className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
+                            >
+                              <X className="size-4" />
+                            </button>
+                          </div>
+                        </motion.li>
+                      ))}
+                    </AnimatePresence>
+                  </ol>
+                )}
+                <div ref={editorListEnd} />
+              </section>
+
+              {editorDraft.id && (
+                <Button
+                  variant="ghost"
+                  className="h-11 self-center text-pink hover:text-pink"
+                  onClick={() => {
+                    haptic.tap();
+                    setShowDeleteConfirm(true);
+                  }}
+                >
+                  <Trash2 className="size-4" />
+                  delete category
+                </Button>
+              )}
             </div>
           </Page>
 

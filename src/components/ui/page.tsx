@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useMotionValue, useTransform } from "motion/re
 import { ChevronLeft } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useKeyboard } from "@/lib/keyboard";
 import { haptic } from "@/lib/native";
 import { usePredictiveBack } from "@/lib/predictive-back";
 import { cn } from "@/lib/utils";
@@ -16,6 +17,8 @@ type PageProps = {
   stacked?: boolean;
   // Follow Android's predictive back swipe (only the top-most layer should).
   predictive?: boolean;
+  // Docked under the scrolling content, and lifted above the on-screen keyboard.
+  footer?: ReactNode;
 };
 
 const DISMISS_OFFSET = 110;
@@ -29,7 +32,9 @@ function Page({
   children,
   stacked = false,
   predictive = false,
+  footer,
 }: PageProps) {
+  const keyboard = useKeyboard();
   const back = usePredictiveBack();
   const idleProgress = useMotionValue(0);
   const idleEdge = useMotionValue(1);
@@ -72,7 +77,18 @@ function Page({
             style={predictive ? { scale, x, borderRadius } : undefined}
             className="absolute inset-0 flex justify-center overflow-hidden bg-background text-foreground shadow-[-16px_0_40px_rgb(0_0_0/0.35)]"
           >
-            <div className="flex h-full w-full max-w-md flex-col px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pr-[max(1.25rem,env(safe-area-inset-right))] pb-[max(1.25rem,env(safe-area-inset-bottom))] pl-[max(1.25rem,env(safe-area-inset-left))]">
+            <div
+              style={
+                footer && keyboard.inset > 0
+                  ? { paddingBottom: keyboard.inset + 12 }
+                  : undefined
+              }
+              className={cn(
+                "flex h-full w-full max-w-md flex-col px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pr-[max(1.25rem,env(safe-area-inset-right))] pb-[max(1.25rem,env(safe-area-inset-bottom))] pl-[max(1.25rem,env(safe-area-inset-left))]",
+                // The keyboard already sits above the home indicator, so a small gap is enough.
+                footer && keyboard.open && "pb-3",
+              )}
+            >
               <header className="flex h-11 shrink-0 items-center gap-1">
                 <Button
                   variant="ghost"
@@ -91,6 +107,7 @@ function Page({
               <div className="relative -mx-5 min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-6 pb-2">
                 {children}
               </div>
+              {footer && <div className="shrink-0 pt-3">{footer}</div>}
             </div>
           </motion.div>
         </motion.div>
