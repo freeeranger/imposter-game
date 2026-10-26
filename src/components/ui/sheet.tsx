@@ -7,6 +7,7 @@ import {
   useTransform,
 } from "motion/react";
 
+import { useIsDesktop } from "@/lib/media";
 import { haptic } from "@/lib/native";
 import { usePredictiveBack } from "@/lib/predictive-back";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,8 @@ type SheetProps = {
   header: ReactNode;
   children: ReactNode;
   className?: string;
+  // Extra classes for the desktop dialog (e.g. a wider max width).
+  desktopClassName?: string;
   // Follow Android's predictive back swipe (only the top-most layer should).
   predictive?: boolean;
 };
@@ -27,6 +30,7 @@ const DISMISS_OFFSET = 110;
 const DISMISS_VELOCITY = 600;
 
 // Bottom sheet that springs up from the bottom and can be swiped down to close.
+// On desktop it is a centered dialog instead: no drag handle, it fades and lifts in.
 function Sheet({
   open,
   onClose,
@@ -34,8 +38,10 @@ function Sheet({
   header,
   children,
   className,
+  desktopClassName,
   predictive = false,
 }: SheetProps) {
+  const isDesktop = useIsDesktop();
   const dragControls = useDragControls();
   const back = usePredictiveBack();
   const idleProgress = useMotionValue(0);
@@ -47,7 +53,7 @@ function Sheet({
   return (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-40 flex items-end justify-center">
+        <div className="fixed inset-0 z-40 flex items-end justify-center lg:items-center lg:p-8">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -58,22 +64,28 @@ function Sheet({
           />
           <motion.div
             style={predictive ? { y: previewY, scale: previewScale } : undefined}
-            className="relative z-10 flex w-full max-w-md origin-bottom justify-center"
+            className={cn(
+              "relative z-10 flex w-full max-w-md origin-bottom justify-center",
+              desktopClassName,
+            )}
           >
           <motion.div
             role="dialog"
             aria-modal="true"
             aria-labelledby={labelledBy}
-            initial={{ y: "100%" }}
+            initial={isDesktop ? { opacity: 0, y: 24, scale: 0.97 } : { y: "100%" }}
             animate={{
+              opacity: 1,
               y: 0,
+              scale: 1,
               transition: { type: "spring", stiffness: 560, damping: 44 },
             }}
-            exit={{
-              y: "100%",
-              transition: { duration: 0.2, ease: [0.4, 0, 1, 1] },
-            }}
-            drag="y"
+            exit={
+              isDesktop
+                ? { opacity: 0, y: 12, scale: 0.98, transition: { duration: 0.15 } }
+                : { y: "100%", transition: { duration: 0.2, ease: [0.4, 0, 1, 1] } }
+            }
+            drag={isDesktop ? false : "y"}
             dragListener={false}
             dragControls={dragControls}
             dragConstraints={{ top: 0, bottom: 0 }}
@@ -89,15 +101,16 @@ function Sheet({
             }}
             className={cn(
               "relative z-10 flex max-h-[calc(100dvh-2.5rem)] w-full max-w-md flex-col gap-3 rounded-t-[32px] bg-card px-5 pt-2.5 pb-[max(1.5rem,env(safe-area-inset-bottom))] text-card-foreground",
+              "lg:max-h-[min(820px,calc(100dvh-4rem))] lg:max-w-none lg:rounded-[32px] lg:border-[1.5px] lg:border-border lg:px-7 lg:pt-6 lg:pb-7 lg:shadow-[0_24px_80px_rgb(0_0_0/0.35)]",
               className,
             )}
           >
             <div
               onPointerDown={(event) => dragControls.start(event)}
-              className="flex shrink-0 cursor-grab touch-none flex-col gap-3 active:cursor-grabbing"
+              className="flex shrink-0 cursor-grab touch-none flex-col gap-3 active:cursor-grabbing lg:cursor-auto lg:active:cursor-auto"
             >
               <span
-                className="h-[5px] w-10 self-center rounded-full bg-border"
+                className="h-[5px] w-10 self-center rounded-full bg-border lg:hidden"
                 aria-hidden="true"
               />
               {header}

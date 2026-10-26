@@ -4,6 +4,7 @@ import { ChevronLeft } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useKeyboard } from "@/lib/keyboard";
+import { useIsDesktop } from "@/lib/media";
 import { haptic } from "@/lib/native";
 import { usePredictiveBack } from "@/lib/predictive-back";
 import { cn } from "@/lib/utils";
@@ -25,6 +26,7 @@ const DISMISS_OFFSET = 110;
 const DISMISS_VELOCITY = 600;
 
 // Full-screen page that slides in from the right; tap back or swipe right to leave.
+// On desktop it is a panel docked to the right edge, over a dimmed app you can click to leave.
 function Page({
   open,
   onClose,
@@ -35,6 +37,7 @@ function Page({
   footer,
 }: PageProps) {
   const keyboard = useKeyboard();
+  const isDesktop = useIsDesktop();
   const back = usePredictiveBack();
   const idleProgress = useMotionValue(0);
   const idleEdge = useMotionValue(1);
@@ -47,8 +50,20 @@ function Page({
 
   return (
     <AnimatePresence>
+      {open && isDesktop && (
+        <motion.div
+          key="backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+          className={cn("fixed inset-0 bg-overlay", stacked ? "z-50" : "z-40")}
+          onClick={onClose}
+        />
+      )}
       {open && (
         <motion.div
+          key="page"
           role="dialog"
           aria-modal="true"
           aria-label={title}
@@ -58,7 +73,7 @@ function Page({
             transition: { type: "spring", stiffness: 520, damping: 46 },
           }}
           exit={{ x: "100%", transition: { duration: 0.22, ease: [0.4, 0, 1, 1] } }}
-          drag="x"
+          drag={isDesktop ? false : "x"}
           dragDirectionLock
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={{ left: 0, right: 1 }}
@@ -71,11 +86,14 @@ function Page({
               onClose();
             }
           }}
-          className={cn("fixed inset-0 touch-pan-y", stacked ? "z-50" : "z-40")}
+          className={cn(
+            "fixed inset-0 touch-pan-y lg:left-auto lg:w-[30rem]",
+            stacked ? "z-50" : "z-40",
+          )}
         >
           <motion.div
             style={predictive ? { scale, x, borderRadius } : undefined}
-            className="absolute inset-0 flex justify-center overflow-hidden bg-background text-foreground shadow-[-16px_0_40px_rgb(0_0_0/0.35)]"
+            className="absolute inset-0 flex justify-center overflow-hidden bg-background text-foreground shadow-[-16px_0_40px_rgb(0_0_0/0.35)] lg:rounded-l-[32px] lg:border-l-[1.5px] lg:border-border"
           >
             <div
               style={
@@ -84,7 +102,7 @@ function Page({
                   : undefined
               }
               className={cn(
-                "flex h-full w-full max-w-md flex-col px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pr-[max(1.25rem,env(safe-area-inset-right))] pb-[max(1.25rem,env(safe-area-inset-bottom))] pl-[max(1.25rem,env(safe-area-inset-left))]",
+                "flex h-full w-full max-w-md flex-col px-5 lg:max-w-none lg:pr-7 lg:pl-7 pt-[max(1.25rem,env(safe-area-inset-top))] pr-[max(1.25rem,env(safe-area-inset-right))] pb-[max(1.25rem,env(safe-area-inset-bottom))] pl-[max(1.25rem,env(safe-area-inset-left))]",
                 // The keyboard already sits above the home indicator, so a small gap is enough.
                 footer && keyboard.open && "pb-3",
               )}
