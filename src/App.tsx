@@ -419,6 +419,7 @@ const THEME_OPTIONS: { value: ThemePreference; label: string }[] = [
 ];
 type PrankMode =
   | "everyone-imposter"
+  | "one-crewmate"
   | "different-words"
   | "no-imposter"
   | "two-imposters";
@@ -1286,6 +1287,11 @@ function App() {
       // Imposters who know each other would notice nobody is listed and smell the prank.
       if (!(revealFellowImposters && impostersCount >= 2)) {
         availablePranks.push("everyone-imposter");
+
+        // With that many imposters already set, a lone crewmate is just a normal round.
+        if (impostersCount < playersCount - 1) {
+          availablePranks.push("one-crewmate");
+        }
       }
 
       if (categoryWords.length >= playersCount) {
@@ -1302,6 +1308,13 @@ function App() {
         assignments = Array.from({ length: playersCount }, () => ({
           isImposter: true,
           word: null,
+        }));
+      } else if (prankMode === "one-crewmate") {
+        const crewmateIndex = randomPlayerNumber(playersCount) - 1;
+        const sharedWord = pickRandom(categoryWords);
+        assignments = Array.from({ length: playersCount }, (_, index) => ({
+          isImposter: index !== crewmateIndex,
+          word: index === crewmateIndex ? sharedWord : null,
         }));
       } else if (prankMode === "different-words") {
         assignments = shuffle(categoryWords)
