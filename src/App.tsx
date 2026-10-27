@@ -1,6 +1,7 @@
 import {
   Fragment,
   useEffect,
+  useEffectEvent,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -266,7 +267,9 @@ const RoundHeader = ({
       </span>
       <span className="size-11" aria-hidden="true" />
     </div>
-    <RoundProgress current={current} total={total} />
+    <div className="lg:mx-auto lg:w-full lg:max-w-[720px]">
+      <RoundProgress current={current} total={total} />
+    </div>
   </div>
 );
 
@@ -308,7 +311,7 @@ const SwipeCard = ({
           onSwipe(info.offset.x > 0 ? 1 : -1);
         }
       }}
-      className="flex h-full w-full cursor-grab touch-pan-y flex-col justify-between rounded-[32px] bg-card p-6 shadow-[10px_10px_0_var(--pink)] active:cursor-grabbing"
+      className="flex h-full w-full cursor-grab touch-pan-y flex-col justify-between rounded-[32px] bg-card p-6 shadow-[10px_10px_0_var(--pink)] active:cursor-grabbing lg:p-8 lg:shadow-[12px_12px_0_var(--pink)]"
     >
       {children}
     </motion.div>
@@ -348,14 +351,23 @@ const wordStartSize = (word: string) => {
 const MIN_WORD_SIZE = 14;
 
 // Lines only break between words; a single word too wide for the card shrinks to fit instead.
-const FitWord = ({ word, className }: { word: string; className?: string }) => {
+const FitWord = ({
+  word,
+  scale = 1,
+  className,
+}: {
+  word: string;
+  // Multiplies the starting size, for the larger desktop card.
+  scale?: number;
+  className?: string;
+}) => {
   const ref = useRef<HTMLParagraphElement>(null);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     const fit = () => {
       const parts = el.querySelectorAll("span");
-      let size = wordStartSize(word);
+      let size = Math.round(wordStartSize(word) * scale);
       parts.forEach((part) => (part.style.whiteSpace = "nowrap"));
       el.style.fontSize = `${size}px`;
       while (el.scrollWidth > el.clientWidth && size > MIN_WORD_SIZE) {
@@ -373,7 +385,7 @@ const FitWord = ({ word, className }: { word: string; className?: string }) => {
     const observer = new ResizeObserver(fit);
     if (el.parentElement) observer.observe(el.parentElement);
     return () => observer.disconnect();
-  }, [word]);
+  }, [word, scale]);
   return (
     <p ref={ref} className={cn("[overflow-wrap:anywhere]", className)}>
       {/* nowrap per word keeps "Counter-Strike" from splitting at its hyphen */}
@@ -1697,10 +1709,42 @@ function App() {
           {primaryIconAtEnd && (
             <PrimaryIcon className="size-[22px] stroke-[2.6]" />
           )}
+          {primaryKey && (
+            <kbd className="ml-1.5 rounded-lg bg-primary-foreground/15 px-2 py-1 font-sans text-[13px] font-bold tracking-normal">
+              {primaryKey}
+            </kbd>
+          )}
         </motion.span>
       </AnimatePresence>
     </Button>
   );
+  // Desktop: space or enter presses the primary button during a round, shown as a key hint on it.
+  const primaryKey =
+    isDesktop && gameState !== "setup"
+      ? gameState === "end"
+        ? "enter"
+        : "space"
+      : null;
+  const onPrimaryKey = useEffectEvent((event: KeyboardEvent) => {
+    if (event.key !== " " && event.key !== "Enter") return;
+    // Holding the key must not run through the players; a focused control handles its own keys.
+    if (event.repeat || hasOpenLayer) return;
+    if (
+      event.target instanceof Element &&
+      event.target.closest("button, a, input, textarea, [role='button']")
+    ) {
+      return;
+    }
+    event.preventDefault();
+    primaryAction();
+  });
+  useEffect(() => {
+    if (!primaryKey) return;
+    const handleKeyDown = (event: KeyboardEvent) => onPrimaryKey(event);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [primaryKey]);
+
   const startHint = (
     <AnimatePresence initial={false}>
       {gameState === "setup" && primaryDisabled && (
@@ -1911,13 +1955,32 @@ function App() {
                     initial={{ opacity: 0, y: -8 }}
                     animate={{ opacity: 1, y: 0, transition: SOFT_SPRING }}
                     exit={FADE_OUT}
-                    className="lg:mx-auto lg:w-full lg:max-w-md"
                   >
                     <RoundHeader
                       current={currentPlayer}
                       total={playersCount}
                       onEnd={endGame}
                     />
+                  </motion.div>
+                )}
+                {isDesktop && gameState === "end" && (
+                  <motion.div
+                    key="end-bar"
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0, transition: SOFT_SPRING }}
+                    exit={FADE_OUT}
+                    className="flex h-11 items-center justify-center gap-2.5 text-sm font-bold"
+                  >
+                    <span className="rounded-full bg-card px-3.5 py-2 lowercase">
+                      {activeCategoryInfo?.label}
+                    </span>
+                    <span className="rounded-full bg-card px-3.5 py-2">
+                      {playersCount} players
+                    </span>
+                    <span className="rounded-full bg-card px-3.5 py-2 text-pink">
+                      {impostersCount}{" "}
+                      {impostersCount === 1 ? "imposter" : "imposters"}
+                    </span>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -2310,22 +2373,53 @@ function App() {
                   >
                     <motion.span
                       variants={RISE}
-                      className="text-base font-semibold text-muted-foreground"
+                      className="text-base font-semibold text-muted-foreground lg:text-xl"
                     >
-                      pass the phone to
+                      {isDesktop ? "pass the screen to" : "pass the phone to"}
                     </motion.span>
-                    <motion.p
-                      variants={PLAYER_POP}
-                      className="font-display text-6xl font-extrabold tracking-[-0.03em] text-highlight"
-                    >
-                      player {currentPlayer}
-                    </motion.p>
-                    <motion.p
-                      variants={RISE}
-                      className="max-w-[16rem] text-sm text-muted-foreground"
-                    >
-                      make sure nobody else is peeking.
-                    </motion.p>
+                    {isDesktop ? (
+                      // Desktop: the face-down card, landscape, with the player's name on its back.
+                      <motion.div
+                        variants={CARD_VARIANTS}
+                        className="mt-6 flex h-[min(400px,48dvh)] w-full max-w-[760px] flex-col justify-between rounded-[32px] bg-card p-8 text-left shadow-[12px_12px_0_var(--pink)]"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[15px] font-semibold text-muted-foreground">
+                            face down
+                          </span>
+                          <VenetianMask
+                            className="size-7 text-pink"
+                            aria-hidden
+                          />
+                        </div>
+                        <p className="text-center font-display text-[104px] leading-none font-extrabold tracking-[-0.045em] text-highlight">
+                          player {currentPlayer}
+                        </p>
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="truncate rounded-full bg-secondary px-3.5 py-2 text-sm font-bold lowercase">
+                            {activeCategoryInfo?.label}
+                          </span>
+                          <span className="shrink-0 text-sm text-muted-foreground">
+                            {currentPlayer} / {playersCount}
+                          </span>
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <>
+                        <motion.p
+                          variants={PLAYER_POP}
+                          className="font-display text-6xl font-extrabold tracking-[-0.03em] text-highlight"
+                        >
+                          player {currentPlayer}
+                        </motion.p>
+                        <motion.p
+                          variants={RISE}
+                          className="max-w-[16rem] text-sm text-muted-foreground"
+                        >
+                          make sure nobody else is peeking.
+                        </motion.p>
+                      </>
+                    )}
                   </motion.div>
                 )}
 
@@ -2340,7 +2434,7 @@ function App() {
                   >
                     <motion.div
                       variants={CARD_VARIANTS}
-                      className="h-[min(420px,52dvh)] w-full max-w-[310px] lg:h-[min(480px,58dvh)] lg:max-w-[350px]"
+                      className="h-[min(420px,52dvh)] w-full max-w-[310px] lg:h-[min(400px,48dvh)] lg:max-w-[760px]"
                     >
                       <SwipeCard onSwipe={passWithSwipe}>
                         <div className="flex items-center justify-between">
@@ -2356,16 +2450,17 @@ function App() {
                         </div>
                         {currentAssignment?.isImposter ? (
                           <div className="flex flex-col items-center gap-2 text-center">
-                            <span className="text-base font-semibold">
+                            <span className="text-base font-semibold lg:text-xl">
                               you are the
                             </span>
-                            <p className="font-display text-[40px] font-extrabold leading-[1.05] tracking-[-0.03em] text-pink">
+                            <p className="font-display text-[40px] font-extrabold leading-[1.05] tracking-[-0.03em] text-pink lg:text-8xl lg:tracking-[-0.045em]">
                               imposter
                             </p>
                           </div>
                         ) : (
                           <FitWord
                             word={currentAssignment?.word ?? "no word"}
+                            scale={isDesktop ? 2.2 : 1}
                             className="text-center font-display font-extrabold leading-[1.05] tracking-[-0.03em] text-balance hyphens-none text-highlight"
                           />
                         )}
@@ -2415,37 +2510,85 @@ function App() {
                     exit={FADE_OUT}
                     className="flex min-h-0 flex-1 flex-col items-center justify-center gap-7 text-center"
                   >
-                    <motion.span
-                      variants={POP}
-                      className="flex size-16 items-center justify-center rounded-full bg-card"
-                    >
-                      <VenetianMask className="size-8 text-pink" aria-hidden />
-                    </motion.span>
-                    <motion.div variants={RISE} className="flex flex-col gap-2">
-                      <h2 className="font-display text-4xl font-extrabold tracking-[-0.03em]">
-                        all clear
-                      </h2>
-                      <p className="mx-auto max-w-xs text-[15px] text-muted-foreground">
-                        everyone has seen their card. put the phone down and
-                        start talking.
-                      </p>
-                    </motion.div>
-                    {startingPlayer && (
-                      <motion.div
-                        variants={DROP_CARD}
-                        className="w-full max-w-xs rounded-[28px] bg-card p-5 shadow-[8px_8px_0_var(--pink)]"
-                      >
-                        <span className="flex items-center justify-center gap-2 text-sm font-semibold text-muted-foreground">
-                          <Shuffle className="size-4 text-pink" aria-hidden />
-                          first to speak
-                        </span>
-                        <p className="mt-2 font-display text-4xl font-extrabold tracking-[-0.03em] text-highlight">
-                          player {startingPlayer}
-                        </p>
-                        <p className="mt-1 text-[13px] text-muted-foreground">
-                          gives the first clue.
-                        </p>
-                      </motion.div>
+                    {isDesktop ? (
+                      // Desktop: the headline, then the first speaker on a wide card.
+                      <>
+                        <motion.h2
+                          variants={RISE}
+                          className="-rotate-2 font-display text-[112px] leading-[0.95] font-extrabold tracking-[-0.045em] [text-shadow:6px_6px_0_var(--pink)]"
+                        >
+                          all clear
+                        </motion.h2>
+                        {startingPlayer && (
+                          <motion.div
+                            variants={DROP_CARD}
+                            className="mt-7 flex w-full max-w-[760px] items-center justify-between gap-6 rounded-[32px] bg-card p-8 text-left shadow-[12px_12px_0_var(--pink)]"
+                          >
+                            <div className="flex flex-col gap-2.5">
+                              <span className="flex items-center gap-2 text-base font-semibold text-muted-foreground">
+                                <Shuffle
+                                  className="size-[18px] text-pink"
+                                  aria-hidden
+                                />
+                                first to speak
+                              </span>
+                              <p className="font-display text-7xl leading-none font-extrabold tracking-[-0.04em] text-highlight">
+                                player {startingPlayer}
+                              </p>
+                            </div>
+                            <span className="flex size-30 shrink-0 items-center justify-center rounded-full bg-secondary">
+                              <VenetianMask
+                                className="size-15 text-pink"
+                                aria-hidden
+                              />
+                            </span>
+                          </motion.div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <motion.span
+                          variants={POP}
+                          className="flex size-16 items-center justify-center rounded-full bg-card"
+                        >
+                          <VenetianMask
+                            className="size-8 text-pink"
+                            aria-hidden
+                          />
+                        </motion.span>
+                        <motion.div
+                          variants={RISE}
+                          className="flex flex-col gap-2"
+                        >
+                          <h2 className="font-display text-4xl font-extrabold tracking-[-0.03em]">
+                            all clear
+                          </h2>
+                          <p className="mx-auto max-w-xs text-[15px] text-muted-foreground">
+                            everyone has seen their card. put the phone down and
+                            start talking.
+                          </p>
+                        </motion.div>
+                        {startingPlayer && (
+                          <motion.div
+                            variants={DROP_CARD}
+                            className="w-full max-w-xs rounded-[28px] bg-card p-5 shadow-[8px_8px_0_var(--pink)]"
+                          >
+                            <span className="flex items-center justify-center gap-2 text-sm font-semibold text-muted-foreground">
+                              <Shuffle
+                                className="size-4 text-pink"
+                                aria-hidden
+                              />
+                              first to speak
+                            </span>
+                            <p className="mt-2 font-display text-4xl font-extrabold tracking-[-0.03em] text-highlight">
+                              player {startingPlayer}
+                            </p>
+                            <p className="mt-1 text-[13px] text-muted-foreground">
+                              gives the first clue.
+                            </p>
+                          </motion.div>
+                        )}
+                      </>
                     )}
                   </motion.div>
                 )}
@@ -2463,7 +2606,7 @@ function App() {
                     }
                   : { opacity: 0, y: 16 }
               }
-              className="shrink-0 pt-4 lg:mx-auto lg:w-full lg:max-w-md"
+              className="shrink-0 pt-4 lg:mx-auto lg:w-full lg:max-w-[480px]"
             >
               {!(isDesktop && gameState === "setup") && (
                 <>
