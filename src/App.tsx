@@ -1938,13 +1938,10 @@ function App() {
                     {isDesktop && (
                       <motion.div
                         variants={RISE}
-                        className="flex min-w-0 flex-1 flex-col items-start gap-8"
+                        className="@container flex min-w-0 flex-1 flex-col items-start gap-8"
                       >
-                        <span className="rounded-full bg-card px-4 py-2 text-sm font-semibold text-muted-foreground">
-                          party game ·{" "}
-                          <span className="text-foreground">3–20 players</span>
-                        </span>
-                        <h1 className="-rotate-2 font-display text-[clamp(4.5rem,9vw,8rem)] leading-[0.95] font-extrabold tracking-[-0.045em] [text-shadow:6px_6px_0_var(--pink)]">
+                        {/* Sized to the column (the word is ~5.6em wide) so it never runs into the settings. */}
+                        <h1 className="-rotate-2 font-display text-[min(8rem,17cqi)] leading-[0.95] font-extrabold tracking-[-0.045em] [text-shadow:6px_6px_0_var(--pink)]">
                           imposter
                         </h1>
                         <p className="max-w-md text-lg leading-relaxed text-muted-foreground">
