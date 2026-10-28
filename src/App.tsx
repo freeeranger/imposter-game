@@ -34,6 +34,7 @@ import {
   Check,
   Loader2,
   Minus,
+  Ellipsis,
   Pencil,
   PenLine,
   Trash2,
@@ -495,6 +496,7 @@ type BackLayer =
   | "share"
   | "import"
   | "add"
+  | "actions"
   | "picker"
   | "editor"
   | "installHelp"
@@ -938,6 +940,12 @@ function App() {
   >("starting");
   const [scannedOtherCode, setScannedOtherCode] = useState<boolean>(false);
   const scannerVideo = useRef<HTMLVideoElement>(null);
+  // The ⋯ sheet on one of your categories: share, edit or delete it. Kept after closing so
+  // the sheet (and the delete confirm) still know which category it was.
+  const [showActionsSheet, setShowActionsSheet] = useState<boolean>(false);
+  const [actionsCategory, setActionsCategory] = useState<CustomCategory | null>(
+    null,
+  );
   const autoDownloadStarted = useRef(false);
   const autoInstallPending = useRef(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
@@ -1110,21 +1118,23 @@ function App() {
             ? "import"
             : showAddSheet
               ? "add"
-              : isNumberPickerOpen
-                ? "picker"
-                : isEditorOpen
-                  ? "editor"
-                  : showInstallHelp
-                    ? "installHelp"
-                    : showLicense
-                      ? "license"
-                      : showSettings
-                        ? "settings"
-                        : showCategorySheet
-                          ? "category"
-                          : showInfoModal
-                            ? "info"
-                            : null;
+              : showActionsSheet
+                ? "actions"
+                : isNumberPickerOpen
+                  ? "picker"
+                  : isEditorOpen
+                    ? "editor"
+                    : showInstallHelp
+                      ? "installHelp"
+                      : showLicense
+                        ? "license"
+                        : showSettings
+                          ? "settings"
+                          : showCategorySheet
+                            ? "category"
+                            : showInfoModal
+                              ? "info"
+                              : null;
   const canGoBack = topLayer !== null || gameState !== "setup";
 
   useEffect(() => {
@@ -1149,6 +1159,8 @@ function App() {
         setShowShareSheet(false);
       } else if (showImportSheet) {
         setShowImportSheet(false);
+      } else if (showActionsSheet) {
+        setShowActionsSheet(false);
       } else if (showAddSheet) {
         if (addMode === "menu") {
           setShowAddSheet(false);
@@ -1619,11 +1631,8 @@ function App() {
     setIsEditorOpen(false);
   };
 
-  // Shares the category as it stands in the editor, saved or not.
-  const openShareSheet = () => {
-    if (!canSaveDraft) return;
+  const openShareSheet = (category: { name: string; words: string[] }) => {
     haptic.tap();
-    const category = { name: draftName, words: editorDraft.words };
     setShareCategory(category);
     setShareUrl(null);
     setLinkCopied(false);
@@ -1790,8 +1799,14 @@ function App() {
     setShowImportSheet(false);
   };
 
-  const deleteCategoryDraft = () => {
-    const id = editorDraft.id;
+  const openCategoryActions = (category: CustomCategory) => {
+    haptic.tap();
+    setActionsCategory(category);
+    setShowActionsSheet(true);
+  };
+
+  const deleteActionsCategory = () => {
+    const id = actionsCategory?.id;
     if (!id) return;
     haptic.press();
     const key = CUSTOM_KEY_PREFIX + id;
@@ -1806,7 +1821,7 @@ function App() {
     if (selectedCategory === key) setSelectedCategory(fallback);
     if (lastSingleCategory === key) setLastSingleCategory(fallback);
     setShowDeleteConfirm(false);
-    setIsEditorOpen(false);
+    setShowActionsSheet(false);
   };
 
   const applyPlayersCount = (value: number) => {
@@ -2095,8 +2110,8 @@ function App() {
           {tile}
           <button
             type="button"
-            aria-label={`Edit ${category.label}`}
-            onClick={() => openCategoryEditor(customCategory)}
+            aria-label={`Options for ${category.label}`}
+            onClick={() => openCategoryActions(customCategory)}
             className={cn(
               "absolute top-1/2 right-1 flex size-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
               isSelected
@@ -2104,7 +2119,7 @@ function App() {
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
-            <Pencil className="size-4" />
+            <Ellipsis className="size-5" />
           </button>
         </div>
       );
@@ -3072,7 +3087,10 @@ function App() {
                 aria-label="Share category"
                 // Needs a name and enough words, the same as saving.
                 disabled={!canSaveDraft}
-                onClick={openShareSheet}
+                // Shares the category as it stands in the editor, saved or not.
+                onClick={() =>
+                  openShareSheet({ name: draftName, words: editorDraft.words })
+                }
               >
                 <Share2 className="size-5 stroke-[2.2]" />
               </Button>
@@ -3229,20 +3247,6 @@ function App() {
                 )}
                 <div ref={editorListEnd} />
               </section>
-
-              {editorDraft.id && (
-                <Button
-                  variant="ghost"
-                  className="h-11 self-center text-pink hover:text-pink"
-                  onClick={() => {
-                    haptic.tap();
-                    setShowDeleteConfirm(true);
-                  }}
-                >
-                  <Trash2 className="size-4" />
-                  delete category
-                </Button>
-              )}
             </div>
           </Page>
 
@@ -3264,9 +3268,82 @@ function App() {
             title="delete this category?"
             confirmLabel="delete"
             cancelLabel="keep it"
-            onConfirm={deleteCategoryDraft}
+            onConfirm={deleteActionsCategory}
             onCancel={() => setShowDeleteConfirm(false)}
           />
+
+          {/* ⋯ on one of your categories: what you can do with it. */}
+          <Sheet
+            open={showActionsSheet}
+            predictive={backTarget === "actions"}
+            onClose={() => setShowActionsSheet(false)}
+            labelledBy="actions-sheet-title"
+            className="gap-5"
+            stacked
+            header={
+              <div className="flex min-h-11 items-center justify-between gap-3">
+                <h2
+                  id="actions-sheet-title"
+                  className="min-w-0 font-display text-[22px] font-extrabold tracking-[-0.02em] [overflow-wrap:anywhere] lowercase"
+                >
+                  {actionsCategory?.name}
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="-mr-2.5 shrink-0"
+                  onClick={() => setShowActionsSheet(false)}
+                  aria-label="Close"
+                >
+                  <X className="size-5 stroke-[2.2]" />
+                </Button>
+              </div>
+            }
+          >
+            <div className="flex flex-col divide-y divide-border/70 rounded-[24px] bg-secondary px-[18px]">
+              {[
+                {
+                  icon: Share2,
+                  label: "share",
+                  onClick: () => {
+                    if (!actionsCategory) return;
+                    setShowActionsSheet(false);
+                    openShareSheet(actionsCategory);
+                  },
+                },
+                {
+                  icon: Pencil,
+                  label: "edit",
+                  onClick: () => {
+                    if (!actionsCategory) return;
+                    setShowActionsSheet(false);
+                    openCategoryEditor(actionsCategory);
+                  },
+                },
+                {
+                  icon: Trash2,
+                  label: "delete",
+                  onClick: () => {
+                    haptic.tap();
+                    setShowDeleteConfirm(true);
+                  },
+                },
+              ].map((option) => (
+                <button
+                  key={option.label}
+                  type="button"
+                  onClick={option.onClick}
+                  className={cn(
+                    "flex min-h-[58px] cursor-pointer items-center gap-3.5 text-left text-base font-semibold outline-none focus-visible:text-pink",
+                    option.label === "delete" && "text-pink",
+                  )}
+                >
+                  <option.icon className="size-5 shrink-0 text-pink" />
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </Sheet>
 
           {/* New category: make one yourself, or add a shared one from its link or QR code. */}
           <Sheet
