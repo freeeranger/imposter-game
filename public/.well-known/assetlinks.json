@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "se.tjeneritz.imposter",
+      "sha256_cert_fingerprints": [
+        "5C:C9:FB:57:61:7D:AE:4D:86:17:C2:E6:16:5B:DC:ED:49:58:54:DD:81:06:CE:54:2D:B6:ED:BC:67:91:B0:7A"
+      ]
+    }
+  }
+]

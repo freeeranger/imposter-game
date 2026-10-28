@@ -11,6 +11,9 @@ import { SplashScreen } from "@capacitor/splash-screen";
 import { Directory, Filesystem } from "@capacitor/filesystem";
 import { FileTransfer } from "@capacitor/file-transfer";
 import { FileOpener } from "@capacitor-community/file-opener";
+import { App as NativeApp } from "@capacitor/app";
+import { Clipboard } from "@capacitor/clipboard";
+import { Share } from "@capacitor/share";
 
 // Native-only features. Every helper is a safe no-op in the browser.
 export const isNativeApp = Capacitor.isNativePlatform();
@@ -174,6 +177,62 @@ export const onPredictiveBack = (handlers: {
   return () => {
     listeners.forEach((listener) => void listener.then((handle) => handle.remove()));
   };
+};
+
+// Hands a link to the system share menu. Returns "copied" where there is no share menu
+// (most desktop browsers), "cancelled" if the menu was closed without picking anything.
+export const shareLink = async (link: {
+  title: string;
+  text: string;
+  url: string;
+}): Promise<"shared" | "copied" | "cancelled"> => {
+  if (isNativeApp) {
+    try {
+      await Share.share({ ...link, dialogTitle: link.title });
+      return "shared";
+    } catch {
+      return "cancelled";
+    }
+  }
+  if (navigator.share) {
+    try {
+      await navigator.share(link);
+      return "shared";
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return "cancelled";
+      }
+      // Anything else (no permission, unsupported data): fall back to copying.
+    }
+  }
+  await navigator.clipboard.writeText(`${link.text} ${link.url}`);
+  return "copied";
+};
+
+// Null when the clipboard is empty or can't be read (the browser may refuse or ask first).
+export const readClipboardText = async (): Promise<string | null> => {
+  try {
+    if (isNativeApp) {
+      const { value } = await Clipboard.read();
+      return value || null;
+    }
+    return (await navigator.clipboard.readText()) || null;
+  } catch {
+    return null;
+  }
+};
+
+// Links that open the app (Android App Links): the one that launched it, then any that
+// arrive while it runs. Returns an unsubscribe function, so it slots straight into a useEffect.
+export const onAppLinkOpened = (handler: (url: string) => void) => {
+  if (!isNativeApp) return () => {};
+  void NativeApp.getLaunchUrl()
+    .then((launch) => {
+      if (launch?.url) handler(launch.url);
+    })
+    .catch(() => {});
+  const listener = NativeApp.addListener("appUrlOpen", (event) => handler(event.url));
+  return () => void listener.then((handle) => handle.remove());
 };
 
 // In the app, a plain link hands external URLs to the system browser; a new tab would go nowhere.

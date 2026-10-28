@@ -15,6 +15,7 @@ import { NumberStepper } from "@/components/ui/number-stepper";
 import { RollingNumber } from "@/components/ui/rolling-number";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Page } from "@/components/ui/page";
+import { QrCode } from "@/components/ui/qr-code";
 import { Sheet } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -38,6 +39,7 @@ import {
   SunMoon,
   Plus,
   ChevronRight,
+  ClipboardPaste,
   ExternalLink,
   Eye,
   EyeOff,
@@ -45,6 +47,7 @@ import {
   Moon,
   Settings,
   Share,
+  Share2,
   SquarePlus,
   Music,
   RotateCcw,
@@ -64,17 +67,26 @@ import {
   isInstalledWebApp,
   isNativeApp,
   isNewerVersion,
+  onAppLinkOpened,
   onPredictiveBack,
   openUpdateInstaller,
+  readClipboardText,
   setBackInterception,
   setHapticsEnabled,
   setKeepAwake,
   setSystemBarsTheme,
+  shareLink,
 } from "@/lib/native";
 import { useKeyboard } from "@/lib/keyboard";
 import { useIsDesktop } from "@/lib/media";
 import { PredictiveBackContext } from "@/lib/predictive-back";
 import { applyPendingWebUpdate } from "@/lib/pwa";
+import {
+  decodeCategory,
+  findShareCode,
+  shareLinkFor,
+  takeShareCodeFromLocation,
+} from "@/lib/share";
 import { cn } from "@/lib/utils";
 
 type CategoryTag = "new" | "updated";
@@ -121,6 +133,7 @@ const DEFAULT_CATEGORY = CATEGORY_KEYS[0] ?? "random";
 const CUSTOM_CATEGORIES_STORAGE_KEY = "imposter-game-custom-categories";
 const CUSTOM_KEY_PREFIX = "custom:";
 const MIN_CUSTOM_WORDS = 3;
+const MAX_CUSTOM_NAME_LENGTH = 28;
 
 const loadCustomCategories = (): CustomCategory[] => {
   try {
@@ -475,6 +488,8 @@ type BackLayer =
   | "confirm"
   | "deleteConfirm"
   | "discardConfirm"
+  | "share"
+  | "import"
   | "picker"
   | "editor"
   | "installHelp"
@@ -482,6 +497,19 @@ type BackLayer =
   | "settings"
   | "category"
   | "info";
+
+// A category arriving from a share link. "renamedFrom" is set when you already have a
+// different category with its name, so it gets a number.
+type IncomingCategory =
+  | { status: "ok"; name: string; words: string[]; renamedFrom?: string }
+  | { status: "duplicate"; name: string }
+  | { status: "newer" | "invalid" | "noLink" };
+
+const wordSetKey = (words: string[]) =>
+  words
+    .map((word) => word.toLowerCase())
+    .sort()
+    .join("\n");
 
 type UpdateStatus =
   | "idle"
@@ -883,6 +911,18 @@ function App() {
   const scrollToNewWord = useRef(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<boolean>(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState<boolean>(false);
+  // Share sheet for a saved custom category; kept after closing so it can animate away.
+  const [showShareSheet, setShowShareSheet] = useState<boolean>(false);
+  const [shareCategory, setShareCategory] = useState<CustomCategory | null>(
+    null,
+  );
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState<boolean>(false);
+  // A shared category waiting to be added; nothing is saved until you say so.
+  const [showImportSheet, setShowImportSheet] = useState<boolean>(false);
+  const [incoming, setIncoming] = useState<IncomingCategory>({
+    status: "invalid",
+  });
   const autoDownloadStarted = useRef(false);
   const autoInstallPending = useRef(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
@@ -1049,21 +1089,25 @@ function App() {
       ? "deleteConfirm"
       : showDiscardConfirm
         ? "discardConfirm"
-        : isNumberPickerOpen
-          ? "picker"
-          : isEditorOpen
-            ? "editor"
-            : showInstallHelp
-              ? "installHelp"
-              : showLicense
-                ? "license"
-                : showSettings
-                  ? "settings"
-                  : showCategorySheet
-                    ? "category"
-                    : showInfoModal
-                      ? "info"
-                      : null;
+        : showShareSheet
+          ? "share"
+          : showImportSheet
+            ? "import"
+            : isNumberPickerOpen
+              ? "picker"
+              : isEditorOpen
+                ? "editor"
+                : showInstallHelp
+                  ? "installHelp"
+                  : showLicense
+                    ? "license"
+                    : showSettings
+                      ? "settings"
+                      : showCategorySheet
+                        ? "category"
+                        : showInfoModal
+                          ? "info"
+                          : null;
   const canGoBack = topLayer !== null || gameState !== "setup";
 
   useEffect(() => {
@@ -1084,6 +1128,10 @@ function App() {
         setShowDeleteConfirm(false);
       } else if (showDiscardConfirm) {
         setShowDiscardConfirm(false);
+      } else if (showShareSheet) {
+        setShowShareSheet(false);
+      } else if (showImportSheet) {
+        setShowImportSheet(false);
       } else if (isNumberPickerOpen) {
         setIsNumberPickerOpen(false);
       } else if (isEditorOpen) {
@@ -1517,30 +1565,159 @@ function App() {
     if (isTypingWords) editorListEnd.current?.scrollIntoView({ block: "end" });
   }, [isTypingWords]);
 
+  const addCustomCategory = (name: string, words: string[]) => {
+    const id = Date.now().toString(36);
+    const key = CUSTOM_KEY_PREFIX + id;
+    setCustomCategories((categories) => [...categories, { id, name, words }]);
+    setRandomPool((pool) => ({ ...pool, [key]: true }));
+    // A brand-new category is probably the one you want to play.
+    if (selectedCategory !== "random") {
+      setSelectedCategory(key);
+      setLastSingleCategory(key);
+    }
+  };
+
   const saveCategoryDraft = () => {
     if (!canSaveDraft) return;
     haptic.success();
-    const id = editorDraft.id ?? Date.now().toString(36);
-    const saved: CustomCategory = {
-      id,
-      name: draftName,
-      words: editorDraft.words,
-    };
-    setCustomCategories((categories) =>
-      editorDraft.id
-        ? categories.map((category) => (category.id === id ? saved : category))
-        : [...categories, saved],
-    );
-    if (!editorDraft.id) {
-      const key = CUSTOM_KEY_PREFIX + id;
-      setRandomPool((pool) => ({ ...pool, [key]: true }));
-      // A brand-new category is probably the one you want to play.
-      if (selectedCategory !== "random") {
-        setSelectedCategory(key);
-        setLastSingleCategory(key);
-      }
+    const id = editorDraft.id;
+    if (id) {
+      const saved: CustomCategory = {
+        id,
+        name: draftName,
+        words: editorDraft.words,
+      };
+      setCustomCategories((categories) =>
+        categories.map((category) => (category.id === id ? saved : category)),
+      );
+    } else {
+      addCustomCategory(draftName, editorDraft.words);
     }
     setIsEditorOpen(false);
+  };
+
+  const openShareSheet = () => {
+    if (!editorOriginal) return;
+    haptic.tap();
+    setShareCategory(editorOriginal);
+    setShareUrl(null);
+    setLinkCopied(false);
+    setShowShareSheet(true);
+    void shareLinkFor({
+      name: editorOriginal.name,
+      easy: editorOriginal.words,
+      hard: [],
+    }).then(setShareUrl);
+  };
+
+  const canUseShareMenu =
+    isNativeApp || (typeof navigator !== "undefined" && "share" in navigator);
+  const sendShareLink = async () => {
+    if (!shareCategory || !shareUrl) return;
+    haptic.tap();
+    try {
+      const result = await shareLink({
+        title: shareCategory.name,
+        text: `Add "${shareCategory.name}" to Imposter:`,
+        url: shareUrl,
+      });
+      if (result === "copied") {
+        haptic.success();
+        setLinkCopied(true);
+      }
+    } catch {
+      // The browser refused the clipboard; the QR code still works.
+    }
+  };
+
+  const showIncoming = (next: IncomingCategory) => {
+    setIncoming(next);
+    setShowImportSheet(true);
+  };
+
+  // A name nobody uses yet: "Skolan" becomes "Skolan (2)", still within the name limit.
+  const freeCategoryName = (name: string) => {
+    const taken = new Set(
+      customCategories.map((category) => category.name.toLowerCase()),
+    );
+    if (!taken.has(name.toLowerCase())) return name;
+    for (let number = 2; ; number += 1) {
+      const suffix = ` (${number})`;
+      const numbered =
+        name.slice(0, MAX_CUSTOM_NAME_LENGTH - suffix.length).trimEnd() +
+        suffix;
+      if (!taken.has(numbered.toLowerCase())) return numbered;
+    }
+  };
+
+  const receiveShareCode = async (code: string) => {
+    const result = await decodeCategory(code);
+    if (result.status !== "ok") {
+      haptic.tap();
+      showIncoming(result);
+      return;
+    }
+    const { name } = result.category;
+    const seen = new Set<string>();
+    const words = [...result.category.easy, ...result.category.hard].filter(
+      (word) => !seen.has(word.toLowerCase()) && seen.add(word.toLowerCase()),
+    );
+    if (words.length < MIN_CUSTOM_WORDS) {
+      haptic.tap();
+      showIncoming({ status: "invalid" });
+      return;
+    }
+    const duplicate = customCategories.find(
+      (category) =>
+        category.name.toLowerCase() === name.toLowerCase() &&
+        wordSetKey(category.words) === wordSetKey(words),
+    );
+    if (duplicate) {
+      haptic.tap();
+      showIncoming({ status: "duplicate", name: duplicate.name });
+      return;
+    }
+    const freeName = freeCategoryName(name);
+    haptic.press();
+    showIncoming({
+      status: "ok",
+      name: freeName,
+      words,
+      renamedFrom: freeName === name ? undefined : name,
+    });
+  };
+
+  // Opened from a share link: in the browser it's in the address bar, in the app it arrives
+  // as an App Link (at launch, or while the app is already open).
+  const onShareLinkOpened = useEffectEvent((url: string | null) => {
+    const code =
+      url === null ? takeShareCodeFromLocation() : findShareCode(url);
+    if (url === null && code === null) return;
+    void receiveShareCode(code ?? "");
+  });
+  useEffect(() => {
+    onShareLinkOpened(null);
+    return onAppLinkOpened(onShareLinkOpened);
+  }, []);
+
+  const importFromClipboard = async () => {
+    haptic.tap();
+    const text = await readClipboardText();
+    const code = text ? findShareCode(text) : null;
+    if (code === null) {
+      showIncoming({ status: "noLink" });
+    } else {
+      void receiveShareCode(code);
+    }
+  };
+
+  const addIncomingCategory = () => {
+    if (incoming.status !== "ok") return;
+    haptic.success();
+    addCustomCategory(incoming.name, incoming.words);
+    // You just asked for this one, so make sure "Your categories" shows it.
+    setInterfacePrefs((prefs) => ({ ...prefs, hideCustomCategories: false }));
+    setShowImportSheet(false);
   };
 
   const deleteCategoryDraft = () => {
@@ -2796,6 +2973,15 @@ function App() {
                       <Plus className="size-4 stroke-[2.6]" />
                       new category
                     </motion.button>
+                    <motion.button
+                      type="button"
+                      whileTap={{ scale: 0.96 }}
+                      onClick={() => void importFromClipboard()}
+                      className="flex h-[54px] cursor-pointer items-center gap-2 rounded-2xl border-[1.5px] border-dashed border-border px-3.5 text-left text-[15px] font-semibold text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60"
+                    >
+                      <ClipboardPaste className="size-4 stroke-[2.2]" />
+                      paste a link
+                    </motion.button>
                   </div>
                 </div>
               )}
@@ -2839,9 +3025,14 @@ function App() {
                     onFocus={() => setIsWordInputFocused(true)}
                     onBlur={() => setIsWordInputFocused(false)}
                     onPaste={(event) => {
-                      const pasted = splitWords(
-                        event.clipboardData.getData("text"),
-                      );
+                      const text = event.clipboardData.getData("text");
+                      const shareCode = findShareCode(text);
+                      if (shareCode) {
+                        event.preventDefault();
+                        void receiveShareCode(shareCode);
+                        return;
+                      }
+                      const pasted = splitWords(text);
                       if (pasted.length > 1) {
                         event.preventDefault();
                         addDraftWords(pasted);
@@ -2892,7 +3083,7 @@ function App() {
                 <input
                   id="custom-category-name"
                   value={editorDraft.name}
-                  maxLength={28}
+                  maxLength={MAX_CUSTOM_NAME_LENGTH}
                   autoComplete="off"
                   enterKeyHint="done"
                   placeholder="give it a name"
@@ -2967,17 +3158,29 @@ function App() {
               </section>
 
               {editorDraft.id && (
-                <Button
-                  variant="ghost"
-                  className="h-11 self-center text-pink hover:text-pink"
-                  onClick={() => {
-                    haptic.tap();
-                    setShowDeleteConfirm(true);
-                  }}
-                >
-                  <Trash2 className="size-4" />
-                  delete category
-                </Button>
+                <div className="flex flex-wrap justify-center gap-x-2">
+                  <Button
+                    variant="ghost"
+                    className="h-11"
+                    // Shares what's saved, so unsaved edits have to be saved first.
+                    disabled={isEditorDirty}
+                    onClick={openShareSheet}
+                  >
+                    <Share2 className="size-4" />
+                    {isEditorDirty ? "save to share" : "share category"}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="h-11 text-pink hover:text-pink"
+                    onClick={() => {
+                      haptic.tap();
+                      setShowDeleteConfirm(true);
+                    }}
+                  >
+                    <Trash2 className="size-4" />
+                    delete category
+                  </Button>
+                </div>
               )}
             </div>
           </Page>
@@ -3003,6 +3206,169 @@ function App() {
             onConfirm={deleteCategoryDraft}
             onCancel={() => setShowDeleteConfirm(false)}
           />
+
+          {/* Share a saved category: a QR code to scan across the table, or a link to send. */}
+          <Sheet
+            open={showShareSheet}
+            predictive={backTarget === "share"}
+            onClose={() => setShowShareSheet(false)}
+            labelledBy="share-sheet-title"
+            className="gap-5"
+            stacked
+            header={
+              <div className="flex h-11 items-center justify-between">
+                <h2
+                  id="share-sheet-title"
+                  className="font-display text-[22px] font-extrabold tracking-[-0.02em]"
+                >
+                  share category
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="-mr-2.5"
+                  onClick={() => setShowShareSheet(false)}
+                  aria-label="Close"
+                >
+                  <X className="size-5 stroke-[2.2]" />
+                </Button>
+              </div>
+            }
+          >
+            <div className="flex flex-col items-center gap-4 overflow-y-auto">
+              <div className="aspect-square w-full max-w-[272px]">
+                {shareUrl ? (
+                  <QrCode
+                    className="size-full"
+                    value={shareUrl}
+                    label={`QR code for ${shareCategory?.name ?? "the category"}`}
+                  />
+                ) : (
+                  <div className="flex size-full items-center justify-center rounded-[24px] bg-secondary">
+                    <Loader2 className="size-6 animate-spin text-muted-foreground" />
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col items-center gap-1 text-center">
+                <span className="max-w-full font-display text-xl font-extrabold tracking-[-0.02em] [overflow-wrap:anywhere] lowercase">
+                  {shareCategory?.name}
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  {shareCategory?.words.length} words · scan with a phone camera
+                  to add it
+                </span>
+              </div>
+            </div>
+            <Button
+              size="lg"
+              className="h-14 w-full shrink-0 text-[17px]"
+              disabled={!shareUrl}
+              onClick={() => void sendShareLink()}
+            >
+              {canUseShareMenu ? (
+                <>
+                  <Share2 className="size-5" />
+                  send link
+                </>
+              ) : linkCopied ? (
+                <>
+                  <Check className="size-5" />
+                  link copied
+                </>
+              ) : (
+                "copy link"
+              )}
+            </Button>
+          </Sheet>
+
+          {/* A category from a share link, checked before anything is saved. The words stay
+              hidden so whoever adds it can still play it. */}
+          <Sheet
+            open={showImportSheet}
+            predictive={backTarget === "import"}
+            onClose={() => setShowImportSheet(false)}
+            labelledBy="import-sheet-title"
+            className="gap-5"
+            stacked
+            header={
+              <div className="flex h-11 items-center justify-between">
+                <h2
+                  id="import-sheet-title"
+                  className="font-display text-[22px] font-extrabold tracking-[-0.02em]"
+                >
+                  {incoming.status === "ok"
+                    ? "add this category?"
+                    : incoming.status === "duplicate"
+                      ? "already added"
+                      : incoming.status === "newer"
+                        ? "update needed"
+                        : incoming.status === "noLink"
+                          ? "no link copied"
+                          : "this link doesn’t work"}
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="-mr-2.5"
+                  onClick={() => setShowImportSheet(false)}
+                  aria-label="Close"
+                >
+                  <X className="size-5 stroke-[2.2]" />
+                </Button>
+              </div>
+            }
+          >
+            {incoming.status === "ok" ? (
+              <>
+                <div className="flex flex-col gap-1 rounded-[20px] bg-secondary px-[18px] py-4">
+                  <span className="font-display text-[26px] leading-tight font-extrabold tracking-[-0.03em] [overflow-wrap:anywhere] lowercase">
+                    {incoming.name}
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {incoming.words.length} words
+                    {incoming.renamedFrom &&
+                      ` · you already have a “${incoming.renamedFrom}”, so this one gets a number`}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <Button
+                    size="lg"
+                    className="h-14 w-full text-[17px]"
+                    onClick={addIncomingCategory}
+                  >
+                    <Plus className="size-5 stroke-[2.6]" />
+                    add category
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="h-11"
+                    onClick={() => setShowImportSheet(false)}
+                  >
+                    not now
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-[15px] leading-relaxed text-muted-foreground">
+                  {incoming.status === "duplicate"
+                    ? `You already have “${incoming.name}” with the same words.`
+                    : incoming.status === "newer"
+                      ? "This category was shared from a newer version of Imposter. Update the app, then open the link again."
+                      : incoming.status === "noLink"
+                        ? "Copy a shared category link first, then tap paste a link again."
+                        : "It might have been cut off when it was copied. Ask for the link again."}
+                </p>
+                <Button
+                  size="lg"
+                  className="h-14 w-full text-[17px]"
+                  onClick={() => setShowImportSheet(false)}
+                >
+                  ok
+                </Button>
+              </>
+            )}
+          </Sheet>
 
           {/* How to play */}
           <Sheet

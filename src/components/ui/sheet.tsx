@@ -24,6 +24,8 @@ type SheetProps = {
   desktopClassName?: string;
   // Follow Android's predictive back swipe (only the top-most layer should).
   predictive?: boolean;
+  // Opens over a stacked page (e.g. the category editor) instead of under it.
+  stacked?: boolean;
 };
 
 const DISMISS_OFFSET = 110;
@@ -40,6 +42,7 @@ function Sheet({
   className,
   desktopClassName,
   predictive = false,
+  stacked = false,
 }: SheetProps) {
   const isDesktop = useIsDesktop();
   const dragControls = useDragControls();
@@ -53,7 +56,12 @@ function Sheet({
   return (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-40 flex items-end justify-center lg:items-center lg:p-8">
+        <div
+          className={cn(
+            "fixed inset-0 flex items-end justify-center lg:items-center lg:p-8",
+            stacked ? "z-50" : "z-40",
+          )}
+        >
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
