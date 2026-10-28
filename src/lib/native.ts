@@ -12,7 +12,6 @@ import { Directory, Filesystem } from "@capacitor/filesystem";
 import { FileTransfer } from "@capacitor/file-transfer";
 import { FileOpener } from "@capacitor-community/file-opener";
 import { App as NativeApp } from "@capacitor/app";
-import { Clipboard } from "@capacitor/clipboard";
 import { Share } from "@capacitor/share";
 
 // Native-only features. Every helper is a safe no-op in the browser.
@@ -207,19 +206,6 @@ export const shareLink = async (link: {
   }
   await navigator.clipboard.writeText(`${link.text} ${link.url}`);
   return "copied";
-};
-
-// Null when the clipboard is empty or can't be read (the browser may refuse or ask first).
-export const readClipboardText = async (): Promise<string | null> => {
-  try {
-    if (isNativeApp) {
-      const { value } = await Clipboard.read();
-      return value || null;
-    }
-    return (await navigator.clipboard.readText()) || null;
-  } catch {
-    return null;
-  }
 };
 
 // Links that open the app (Android App Links): the one that launched it, then any that

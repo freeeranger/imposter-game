@@ -35,12 +35,14 @@ import {
   Loader2,
   Minus,
   Pencil,
+  PenLine,
   Trash2,
   SunMoon,
   Plus,
   ChevronRight,
-  ClipboardPaste,
+  ChevronLeft,
   ExternalLink,
+  Link,
   Eye,
   EyeOff,
   Info,
@@ -51,6 +53,7 @@ import {
   SquarePlus,
   Music,
   RotateCcw,
+  ScanLine,
   Shuffle,
   Sun,
   VenetianMask,
@@ -70,7 +73,6 @@ import {
   onAppLinkOpened,
   onPredictiveBack,
   openUpdateInstaller,
-  readClipboardText,
   setBackInterception,
   setHapticsEnabled,
   setKeepAwake,
@@ -81,6 +83,8 @@ import { useKeyboard } from "@/lib/keyboard";
 import { useIsDesktop } from "@/lib/media";
 import { PredictiveBackContext } from "@/lib/predictive-back";
 import { applyPendingWebUpdate } from "@/lib/pwa";
+import { canUseCamera, startQrScanner } from "@/lib/qr-scanner";
+import type { ScannerError } from "@/lib/qr-scanner";
 import {
   decodeCategory,
   findShareCode,
@@ -490,6 +494,7 @@ type BackLayer =
   | "discardConfirm"
   | "share"
   | "import"
+  | "add"
   | "picker"
   | "editor"
   | "installHelp"
@@ -503,7 +508,7 @@ type BackLayer =
 type IncomingCategory =
   | { status: "ok"; name: string; words: string[]; renamedFrom?: string }
   | { status: "duplicate"; name: string }
-  | { status: "newer" | "invalid" | "noLink" };
+  | { status: "newer" | "invalid" };
 
 const wordSetKey = (words: string[]) =>
   words
@@ -913,9 +918,10 @@ function App() {
   const [showDiscardConfirm, setShowDiscardConfirm] = useState<boolean>(false);
   // Share sheet for a saved custom category; kept after closing so it can animate away.
   const [showShareSheet, setShowShareSheet] = useState<boolean>(false);
-  const [shareCategory, setShareCategory] = useState<CustomCategory | null>(
-    null,
-  );
+  const [shareCategory, setShareCategory] = useState<{
+    name: string;
+    words: string[];
+  } | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState<boolean>(false);
   // A shared category waiting to be added; nothing is saved until you say so.
@@ -923,6 +929,16 @@ function App() {
   const [incoming, setIncoming] = useState<IncomingCategory>({
     status: "invalid",
   });
+  // "new category": create one, or add a shared one from a link or its QR code.
+  const [showAddSheet, setShowAddSheet] = useState<boolean>(false);
+  const [addMode, setAddMode] = useState<"menu" | "link" | "scan">("menu");
+  const [linkDraft, setLinkDraft] = useState<string>("");
+  const [linkError, setLinkError] = useState<boolean>(false);
+  const [scanStatus, setScanStatus] = useState<
+    "starting" | "scanning" | ScannerError
+  >("starting");
+  const [scannedOtherCode, setScannedOtherCode] = useState<boolean>(false);
+  const scannerVideo = useRef<HTMLVideoElement>(null);
   const autoDownloadStarted = useRef(false);
   const autoInstallPending = useRef(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
@@ -1093,21 +1109,23 @@ function App() {
           ? "share"
           : showImportSheet
             ? "import"
-            : isNumberPickerOpen
-              ? "picker"
-              : isEditorOpen
-                ? "editor"
-                : showInstallHelp
-                  ? "installHelp"
-                  : showLicense
-                    ? "license"
-                    : showSettings
-                      ? "settings"
-                      : showCategorySheet
-                        ? "category"
-                        : showInfoModal
-                          ? "info"
-                          : null;
+            : showAddSheet
+              ? "add"
+              : isNumberPickerOpen
+                ? "picker"
+                : isEditorOpen
+                  ? "editor"
+                  : showInstallHelp
+                    ? "installHelp"
+                    : showLicense
+                      ? "license"
+                      : showSettings
+                        ? "settings"
+                        : showCategorySheet
+                          ? "category"
+                          : showInfoModal
+                            ? "info"
+                            : null;
   const canGoBack = topLayer !== null || gameState !== "setup";
 
   useEffect(() => {
@@ -1132,6 +1150,12 @@ function App() {
         setShowShareSheet(false);
       } else if (showImportSheet) {
         setShowImportSheet(false);
+      } else if (showAddSheet) {
+        if (addMode === "menu") {
+          setShowAddSheet(false);
+        } else {
+          setAddMode("menu");
+        }
       } else if (isNumberPickerOpen) {
         setIsNumberPickerOpen(false);
       } else if (isEditorOpen) {
@@ -1596,16 +1620,18 @@ function App() {
     setIsEditorOpen(false);
   };
 
+  // Shares the category as it stands in the editor, saved or not.
   const openShareSheet = () => {
-    if (!editorOriginal) return;
+    if (!canSaveDraft) return;
     haptic.tap();
-    setShareCategory(editorOriginal);
+    const category = { name: draftName, words: editorDraft.words };
+    setShareCategory(category);
     setShareUrl(null);
     setLinkCopied(false);
     setShowShareSheet(true);
     void shareLinkFor({
-      name: editorOriginal.name,
-      easy: editorOriginal.words,
+      name: category.name,
+      easy: category.words,
       hard: [],
     }).then(setShareUrl);
   };
@@ -1700,16 +1726,67 @@ function App() {
     return onAppLinkOpened(onShareLinkOpened);
   }, []);
 
-  const importFromClipboard = async () => {
+  const openAddSheet = () => {
     haptic.tap();
-    const text = await readClipboardText();
-    const code = text ? findShareCode(text) : null;
-    if (code === null) {
-      showIncoming({ status: "noLink" });
-    } else {
-      void receiveShareCode(code);
-    }
+    setAddMode("menu");
+    setShowAddSheet(true);
   };
+
+  const openAddMode = (mode: "link" | "scan") => {
+    haptic.tap();
+    setLinkDraft("");
+    setLinkError(false);
+    setScanStatus("starting");
+    setScannedOtherCode(false);
+    setAddMode(mode);
+  };
+
+  const submitLink = () => {
+    const code = findShareCode(linkDraft);
+    if (code === null) {
+      haptic.tap();
+      setLinkError(true);
+      return;
+    }
+    setShowAddSheet(false);
+    void receiveShareCode(code);
+  };
+
+  // True once a category's code is read, which ends the scan.
+  const onScannedText = useEffectEvent((text: string) => {
+    const code = findShareCode(text);
+    if (code === null) {
+      setScannedOtherCode(true);
+      return false;
+    }
+    setShowAddSheet(false);
+    void receiveShareCode(code);
+    return true;
+  });
+  const isScanning = showAddSheet && addMode === "scan";
+  useEffect(() => {
+    const video = scannerVideo.current;
+    if (!isScanning || !video) return;
+    let done = false;
+    let stop: (() => void) | undefined;
+    startQrScanner(video, (text) => {
+      if (done || !onScannedText(text)) return;
+      done = true;
+      stop?.();
+    })
+      .then((stopScanner) => {
+        stop = stopScanner;
+        if (done) stopScanner();
+        else setScanStatus("scanning");
+      })
+      .catch((error: ScannerError) => {
+        if (!done) setScanStatus(error);
+      });
+    return () => {
+      done = true;
+      stop?.();
+    };
+  }, [isScanning]);
 
   const addIncomingCategory = () => {
     if (incoming.status !== "ok") return;
@@ -2967,20 +3044,11 @@ function App() {
                     <motion.button
                       type="button"
                       whileTap={{ scale: 0.96 }}
-                      onClick={() => openCategoryEditor()}
+                      onClick={openAddSheet}
                       className="flex h-[54px] cursor-pointer items-center gap-2 rounded-2xl border-[1.5px] border-dashed border-pink/70 px-3.5 text-left text-[15px] font-semibold text-pink outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60"
                     >
                       <Plus className="size-4 stroke-[2.6]" />
                       new category
-                    </motion.button>
-                    <motion.button
-                      type="button"
-                      whileTap={{ scale: 0.96 }}
-                      onClick={() => void importFromClipboard()}
-                      className="flex h-[54px] cursor-pointer items-center gap-2 rounded-2xl border-[1.5px] border-dashed border-border px-3.5 text-left text-[15px] font-semibold text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60"
-                    >
-                      <ClipboardPaste className="size-4 stroke-[2.2]" />
-                      paste a link
                     </motion.button>
                   </div>
                 </div>
@@ -3004,6 +3072,18 @@ function App() {
             onClose={requestCloseEditor}
             title={editorDraft.id ? "edit category" : "new category"}
             stacked
+            action={
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Share category"
+                // Needs a name and enough words, the same as saving.
+                disabled={!canSaveDraft}
+                onClick={openShareSheet}
+              >
+                <Share2 className="size-5 stroke-[2.2]" />
+              </Button>
+            }
             footer={
               <div className="flex flex-col gap-3">
                 <form
@@ -3158,29 +3238,17 @@ function App() {
               </section>
 
               {editorDraft.id && (
-                <div className="flex flex-wrap justify-center gap-x-2">
-                  <Button
-                    variant="ghost"
-                    className="h-11"
-                    // Shares what's saved, so unsaved edits have to be saved first.
-                    disabled={isEditorDirty}
-                    onClick={openShareSheet}
-                  >
-                    <Share2 className="size-4" />
-                    {isEditorDirty ? "save to share" : "share category"}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="h-11 text-pink hover:text-pink"
-                    onClick={() => {
-                      haptic.tap();
-                      setShowDeleteConfirm(true);
-                    }}
-                  >
-                    <Trash2 className="size-4" />
-                    delete category
-                  </Button>
-                </div>
+                <Button
+                  variant="ghost"
+                  className="h-11 self-center text-pink hover:text-pink"
+                  onClick={() => {
+                    haptic.tap();
+                    setShowDeleteConfirm(true);
+                  }}
+                >
+                  <Trash2 className="size-4" />
+                  delete category
+                </Button>
               )}
             </div>
           </Page>
@@ -3207,7 +3275,178 @@ function App() {
             onCancel={() => setShowDeleteConfirm(false)}
           />
 
-          {/* Share a saved category: a QR code to scan across the table, or a link to send. */}
+          {/* New category: make one yourself, or add a shared one from its link or QR code. */}
+          <Sheet
+            open={showAddSheet}
+            predictive={backTarget === "add"}
+            onClose={() => setShowAddSheet(false)}
+            labelledBy="add-sheet-title"
+            className="gap-5"
+            stacked
+            header={
+              <div className="flex h-11 items-center gap-1">
+                {addMode !== "menu" && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="-ml-3"
+                    onClick={() => setAddMode("menu")}
+                    aria-label="Back"
+                  >
+                    <ChevronLeft className="size-6 stroke-[2.2]" />
+                  </Button>
+                )}
+                <h2
+                  id="add-sheet-title"
+                  className="font-display text-[22px] font-extrabold tracking-[-0.02em]"
+                >
+                  {addMode === "link"
+                    ? "paste a link"
+                    : addMode === "scan"
+                      ? "scan a QR code"
+                      : "new category"}
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="-mr-2.5 ml-auto"
+                  onClick={() => setShowAddSheet(false)}
+                  aria-label="Close"
+                >
+                  <X className="size-5 stroke-[2.2]" />
+                </Button>
+              </div>
+            }
+          >
+            {addMode === "menu" && (
+              <div className="flex flex-col divide-y divide-border/70 rounded-[24px] bg-secondary px-[18px]">
+                {[
+                  {
+                    icon: PenLine,
+                    label: "make your own",
+                    onClick: () => {
+                      setShowAddSheet(false);
+                      openCategoryEditor();
+                    },
+                  },
+                  {
+                    icon: Link,
+                    label: "paste a link",
+                    onClick: () => openAddMode("link"),
+                  },
+                  ...(canUseCamera
+                    ? [
+                        {
+                          icon: ScanLine,
+                          label: "scan a QR code",
+                          onClick: () => openAddMode("scan"),
+                        },
+                      ]
+                    : []),
+                ].map((option) => (
+                  <button
+                    key={option.label}
+                    type="button"
+                    onClick={option.onClick}
+                    className="flex min-h-[58px] cursor-pointer items-center gap-3.5 text-left text-base font-semibold outline-none focus-visible:text-pink"
+                  >
+                    <option.icon className="size-5 shrink-0 text-pink" />
+                    <span className="flex-1">{option.label}</span>
+                    <ChevronRight className="size-4 text-muted-foreground" />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {addMode === "link" && (
+              <form
+                className="flex flex-col gap-3"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  submitLink();
+                }}
+              >
+                <Input
+                  aria-label="Shared category link"
+                  value={linkDraft}
+                  autoFocus
+                  autoComplete="off"
+                  enterKeyHint="go"
+                  placeholder="tjeneritz.se/c#…"
+                  onChange={(event) => {
+                    setLinkDraft(event.target.value);
+                    setLinkError(false);
+                  }}
+                  className="h-12 bg-secondary text-base"
+                />
+                <p
+                  className={cn(
+                    "px-1 text-sm",
+                    linkError ? "text-pink" : "text-muted-foreground",
+                  )}
+                >
+                  {linkError
+                    ? "That isn’t a category link. Copy the whole link and try again."
+                    : "Paste the link someone sent you. The whole message is fine too."}
+                </p>
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="h-14 w-full text-[17px]"
+                  disabled={!linkDraft.trim()}
+                >
+                  continue
+                </Button>
+              </form>
+            )}
+
+            {addMode === "scan" && (
+              <div className="flex flex-col items-center gap-4 pb-2">
+                <div className="relative aspect-square w-full max-w-[272px] overflow-hidden rounded-[24px] bg-black">
+                  <video
+                    ref={scannerVideo}
+                    muted
+                    playsInline
+                    className="size-full object-cover"
+                  />
+                  {scanStatus === "starting" && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Loader2 className="size-6 animate-spin text-white/70" />
+                    </div>
+                  )}
+                  {(scanStatus === "denied" ||
+                    scanStatus === "unavailable") && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-secondary p-6 text-center text-[15px] text-muted-foreground">
+                      {scanStatus === "denied"
+                        ? "Camera access is turned off for Imposter. Allow it in your settings, or paste the link instead."
+                        : "The camera couldn’t start. Paste the link instead."}
+                    </div>
+                  )}
+                </div>
+                <p
+                  className={cn(
+                    "text-center text-sm",
+                    scannedOtherCode ? "text-pink" : "text-muted-foreground",
+                  )}
+                >
+                  {scannedOtherCode
+                    ? "That QR code isn’t an Imposter category."
+                    : "Point the camera at the QR code on the other phone."}
+                </p>
+                {(scanStatus === "denied" || scanStatus === "unavailable") && (
+                  <Button
+                    size="lg"
+                    className="h-14 w-full text-[17px]"
+                    onClick={() => openAddMode("link")}
+                  >
+                    paste a link instead
+                  </Button>
+                )}
+              </div>
+            )}
+          </Sheet>
+
+          {/* Share a category: a QR code to scan across the table, or a link to send. */}
           <Sheet
             open={showShareSheet}
             predictive={backTarget === "share"}
@@ -3302,9 +3541,7 @@ function App() {
                       ? "already added"
                       : incoming.status === "newer"
                         ? "update needed"
-                        : incoming.status === "noLink"
-                          ? "no link copied"
-                          : "this link doesn’t work"}
+                        : "this link doesn’t work"}
                 </h2>
                 <Button
                   variant="ghost"
@@ -3355,9 +3592,7 @@ function App() {
                     ? `You already have “${incoming.name}” with the same words.`
                     : incoming.status === "newer"
                       ? "This category was shared from a newer version of Imposter. Update the app, then open the link again."
-                      : incoming.status === "noLink"
-                        ? "Copy a shared category link first, then tap paste a link again."
-                        : "It might have been cut off when it was copied. Ask for the link again."}
+                      : "It might have been cut off when it was copied. Ask for the link again."}
                 </p>
                 <Button
                   size="lg"

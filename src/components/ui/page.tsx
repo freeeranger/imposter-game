@@ -20,6 +20,8 @@ type PageProps = {
   predictive?: boolean;
   // Docked under the scrolling content, and lifted above the on-screen keyboard.
   footer?: ReactNode;
+  // Sits at the right end of the title bar (e.g. a share button).
+  action?: ReactNode;
 };
 
 const DISMISS_OFFSET = 110;
@@ -35,6 +37,7 @@ function Page({
   stacked = false,
   predictive = false,
   footer,
+  action,
 }: PageProps) {
   const keyboard = useKeyboard();
   const isDesktop = useIsDesktop();
@@ -120,6 +123,7 @@ function Page({
                 <h1 className="font-display text-[28px] leading-none font-extrabold tracking-[-0.03em]">
                   {title}
                 </h1>
+                {action && <div className="-mr-3 ml-auto shrink-0">{action}</div>}
               </header>
               {/* relative so popLayout animations inside measure against the scrolled content */}
               <div className="relative -mx-5 min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-6 pb-2">

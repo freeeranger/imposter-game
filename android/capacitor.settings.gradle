@@ -11,9 +11,6 @@ project(':capacitor-community-keep-awake').projectDir = new File('../node_module
 include ':capacitor-app'
 project(':capacitor-app').projectDir = new File('../node_modules/@capacitor/app/android')
 
-include ':capacitor-clipboard'
-project(':capacitor-clipboard').projectDir = new File('../node_modules/@capacitor/clipboard/android')
-
 include ':capacitor-file-transfer'
 project(':capacitor-file-transfer').projectDir = new File('../node_modules/@capacitor/file-transfer/android')
 
