@@ -3521,11 +3521,16 @@ function App() {
                 <div className="flex flex-col divide-y divide-border/70 rounded-[24px] bg-card px-[18px]">
                   {[
                     { label: "Made by", value: AUTHOR_NAME, href: AUTHOR_URL },
-                    {
-                      label: "Website",
-                      value: "tjeneritz.se",
-                      href: WEBSITE_URL,
-                    },
+                    // In a browser tab you're already on the website.
+                    ...(isNativeApp || isInstalledWebApp
+                      ? [
+                          {
+                            label: "Website",
+                            value: "tjeneritz.se",
+                            href: WEBSITE_URL,
+                          },
+                        ]
+                      : []),
                     {
                       label: "Source code",
                       value: "GitHub",
