@@ -29,7 +29,9 @@ import {
 import type { Variants } from "motion/react";
 import type { LucideIcon } from "lucide-react";
 import {
+  ArrowDown,
   ArrowRight,
+  ArrowUp,
   Download,
   Check,
   Loader2,
@@ -110,11 +112,17 @@ type Category = {
   hard: string[];
   tag?: CategoryTag;
   hint?: string;
-  // Made by the players on this device; its words aren't split by difficulty.
+  // Made by the players on this device. Only split by difficulty if it has hard words.
   custom?: boolean;
 };
 
-type CustomCategory = { id: string; name: string; words: string[] };
+// "words" are the easy words when there are hard ones, otherwise all of them.
+type CustomCategory = {
+  id: string;
+  name: string;
+  words: string[];
+  hard: string[];
+};
 
 const categoryFiles = import.meta.glob<{ default: CategoryFile }>(
   "./data/*.json",
@@ -157,13 +165,19 @@ const loadCustomCategories = (): CustomCategory[] => {
       ) {
         return [];
       }
-      const words = (item.words as unknown[])
-        .filter((word): word is string => typeof word === "string")
-        .map((word) => word.trim())
-        .filter(Boolean);
+      const cleanWords = (value: unknown) =>
+        (Array.isArray(value) ? (value as unknown[]) : [])
+          .filter((word): word is string => typeof word === "string")
+          .map((word) => word.trim())
+          .filter(Boolean);
+      const words = cleanWords(item.words);
       if (words.length === 0) return [];
+      const easy = new Set(words.map((word) => word.toLowerCase()));
+      const hard = cleanWords(item.hard).filter(
+        (word) => !easy.has(word.toLowerCase()),
+      );
       seenIds.add(item.id);
-      return [{ id: item.id, name: item.name, words }];
+      return [{ id: item.id, name: item.name, words, hard }];
     });
   } catch {
     return [];
@@ -174,7 +188,12 @@ const toCategoryMap = (customCategories: CustomCategory[]) =>
   Object.fromEntries(
     customCategories.map((category): [string, Category] => [
       CUSTOM_KEY_PREFIX + category.id,
-      { label: category.name, easy: category.words, hard: [], custom: true },
+      {
+        label: category.name,
+        easy: category.words,
+        hard: category.hard,
+        custom: true,
+      },
     ]),
   );
 
@@ -421,7 +440,8 @@ const getCategoryWords = (
   category: Category,
   difficulty: Difficulty,
 ): string[] => {
-  if (category.custom) return [...category.easy, ...category.hard];
+  // A custom category with one list plays the same words at every difficulty.
+  if (category.custom && category.hard.length === 0) return category.easy;
   if (difficulty === "easy") return category.easy;
   if (difficulty === "hard") return category.hard;
   return [...category.easy, ...category.hard];
@@ -507,7 +527,7 @@ type BackLayer =
 
 // A category arriving from a share link, already numbered if you have one with its name.
 type IncomingCategory =
-  | { status: "ok"; name: string; words: string[] }
+  | { status: "ok"; name: string; words: string[]; hard: string[] }
   | { status: "duplicate"; name: string }
   | { status: "newer" | "invalid" };
 
@@ -909,7 +929,12 @@ function App() {
     id: string | null;
     name: string;
     words: string[];
-  }>({ id: null, name: "", words: [] });
+    hard: string[];
+    // Easy and hard words in separate lists; "words" holds the easy ones then.
+    levels: boolean;
+  }>({ id: null, name: "", words: [], hard: [], levels: false });
+  // Which list typed words go into while levels are on.
+  const [addLevel, setAddLevel] = useState<"easy" | "hard">("easy");
   const [wordDraft, setWordDraft] = useState<string>("");
   const [isWordInputFocused, setIsWordInputFocused] = useState<boolean>(false);
   const keyboard = useKeyboard();
@@ -922,6 +947,7 @@ function App() {
   const [shareCategory, setShareCategory] = useState<{
     name: string;
     words: string[];
+    hard: string[];
   } | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState<boolean>(false);
@@ -1077,8 +1103,13 @@ function App() {
   }, [gameState]);
 
   const draftName = editorDraft.name.trim();
+  const draftHard = editorDraft.levels ? editorDraft.hard : [];
   const missingWords = Math.max(0, MIN_CUSTOM_WORDS - editorDraft.words.length);
-  const canSaveDraft = draftName.length > 0 && missingWords === 0;
+  const missingHardWords = editorDraft.levels
+    ? Math.max(0, MIN_CUSTOM_WORDS - editorDraft.hard.length)
+    : 0;
+  const canSaveDraft =
+    draftName.length > 0 && missingWords === 0 && missingHardWords === 0;
   const editorOriginal = customCategories.find(
     (category) => category.id === editorDraft.id,
   );
@@ -1086,8 +1117,12 @@ function App() {
     wordDraft.trim() !== "" ||
     (editorOriginal
       ? draftName !== editorOriginal.name ||
-        editorDraft.words.join("\n") !== editorOriginal.words.join("\n")
-      : draftName !== "" || editorDraft.words.length > 0);
+        editorDraft.words.join("\n") !== editorOriginal.words.join("\n") ||
+        draftHard.join("\n") !== editorOriginal.hard.join("\n") ||
+        editorDraft.levels !== editorOriginal.hard.length > 0
+      : draftName !== "" ||
+        editorDraft.words.length > 0 ||
+        draftHard.length > 0);
 
   const requestCloseEditor = () => {
     if (isEditorDirty) {
@@ -1565,9 +1600,16 @@ function App() {
     haptic.tap();
     setEditorDraft(
       category
-        ? { id: category.id, name: category.name, words: [...category.words] }
-        : { id: null, name: "", words: [] },
+        ? {
+            id: category.id,
+            name: category.name,
+            words: [...category.words],
+            hard: [...category.hard],
+            levels: category.hard.length > 0,
+          }
+        : { id: null, name: "", words: [], hard: [], levels: false },
     );
+    setAddLevel("easy");
     setWordDraft("");
     setIsEditorOpen(true);
   };
@@ -1576,14 +1618,18 @@ function App() {
     if (words.length === 0) return;
     haptic.tap();
     setEditorDraft((draft) => {
-      const seen = new Set(draft.words.map((word) => word.toLowerCase()));
-      const nextWords = [...draft.words];
+      const field = draft.levels && addLevel === "hard" ? "hard" : "words";
+      // A word lives in one list only, so check both.
+      const seen = new Set(
+        [...draft.words, ...draft.hard].map((word) => word.toLowerCase()),
+      );
+      const nextWords = [...draft[field]];
       for (const word of words) {
         if (seen.has(word.toLowerCase())) continue;
         seen.add(word.toLowerCase());
         nextWords.push(word);
       }
-      return { ...draft, words: nextWords };
+      return { ...draft, [field]: nextWords };
     });
     scrollToNewWord.current = true;
   };
@@ -1594,16 +1640,52 @@ function App() {
     if (!scrollToNewWord.current) return;
     scrollToNewWord.current = false;
     editorListEnd.current?.scrollIntoView({ block: "end", behavior: "smooth" });
-  }, [editorDraft.words.length]);
+  }, [editorDraft.words.length, editorDraft.hard.length]);
   const isTypingWords = keyboard.open && isWordInputFocused;
   useEffect(() => {
     if (isTypingWords) editorListEnd.current?.scrollIntoView({ block: "end" });
   }, [isTypingWords]);
 
-  const addCustomCategory = (name: string, words: string[]) => {
+  const setDraftLevels = (levels: boolean) => {
+    setAddLevel("easy");
+    setEditorDraft((draft) =>
+      levels
+        ? { ...draft, levels }
+        : // Back to one list: the hard words join the rest.
+          {
+            ...draft,
+            levels,
+            words: [...draft.words, ...draft.hard],
+            hard: [],
+          },
+    );
+  };
+
+  const removeDraftWord = (field: "words" | "hard", word: string) => {
+    haptic.tap();
+    setEditorDraft((draft) => ({
+      ...draft,
+      [field]: draft[field].filter((item) => item !== word),
+    }));
+  };
+
+  const moveDraftWord = (from: "words" | "hard", word: string) => {
+    haptic.tap();
+    const to = from === "words" ? "hard" : "words";
+    setEditorDraft((draft) => ({
+      ...draft,
+      [from]: draft[from].filter((item) => item !== word),
+      [to]: [...draft[to], word],
+    }));
+  };
+
+  const addCustomCategory = (name: string, words: string[], hard: string[]) => {
     const id = Date.now().toString(36);
     const key = CUSTOM_KEY_PREFIX + id;
-    setCustomCategories((categories) => [...categories, { id, name, words }]);
+    setCustomCategories((categories) => [
+      ...categories,
+      { id, name, words, hard },
+    ]);
     setRandomPool((pool) => ({ ...pool, [key]: true }));
     // A brand-new category is probably the one you want to play.
     if (selectedCategory !== "random") {
@@ -1621,17 +1703,22 @@ function App() {
         id,
         name: draftName,
         words: editorDraft.words,
+        hard: draftHard,
       };
       setCustomCategories((categories) =>
         categories.map((category) => (category.id === id ? saved : category)),
       );
     } else {
-      addCustomCategory(draftName, editorDraft.words);
+      addCustomCategory(draftName, editorDraft.words, draftHard);
     }
     setIsEditorOpen(false);
   };
 
-  const openShareSheet = (category: { name: string; words: string[] }) => {
+  const openShareSheet = (category: {
+    name: string;
+    words: string[];
+    hard: string[];
+  }) => {
     haptic.tap();
     setShareCategory(category);
     setShareUrl(null);
@@ -1640,7 +1727,7 @@ function App() {
     void shareLinkFor({
       name: category.name,
       easy: category.words,
-      hard: [],
+      hard: category.hard,
     }).then(setShareUrl);
   };
 
@@ -1691,11 +1778,16 @@ function App() {
       showIncoming(result);
       return;
     }
-    const { name } = result.category;
-    const seen = new Set<string>();
-    const words = [...result.category.easy, ...result.category.hard].filter(
-      (word) => !seen.has(word.toLowerCase()) && seen.add(word.toLowerCase()),
+    const { name, easy } = result.category;
+    const easyKeys = new Set(easy.map((word) => word.toLowerCase()));
+    const hardOnly = result.category.hard.filter(
+      (word) => !easyKeys.has(word.toLowerCase()),
     );
+    // Easy and hard stay apart only if both have enough words to play; else it's one list.
+    const levels =
+      easy.length >= MIN_CUSTOM_WORDS && hardOnly.length >= MIN_CUSTOM_WORDS;
+    const words = levels ? easy : [...easy, ...hardOnly];
+    const hard = levels ? hardOnly : [];
     if (words.length < MIN_CUSTOM_WORDS) {
       haptic.tap();
       showIncoming({ status: "invalid" });
@@ -1704,7 +1796,8 @@ function App() {
     const duplicate = customCategories.find(
       (category) =>
         category.name.toLowerCase() === name.toLowerCase() &&
-        wordSetKey(category.words) === wordSetKey(words),
+        wordSetKey(category.words) === wordSetKey(words) &&
+        wordSetKey(category.hard) === wordSetKey(hard),
     );
     if (duplicate) {
       haptic.tap();
@@ -1712,7 +1805,7 @@ function App() {
       return;
     }
     haptic.press();
-    showIncoming({ status: "ok", name: freeCategoryName(name), words });
+    showIncoming({ status: "ok", name: freeCategoryName(name), words, hard });
   };
 
   // Opened from a share link: in the browser it's in the address bar, in the app it arrives
@@ -1793,7 +1886,7 @@ function App() {
   const addIncomingCategory = () => {
     if (incoming.status !== "ok") return;
     haptic.success();
-    addCustomCategory(incoming.name, incoming.words);
+    addCustomCategory(incoming.name, incoming.words, incoming.hard);
     // You just asked for this one, so make sure "Your categories" shows it.
     setInterfacePrefs((prefs) => ({ ...prefs, hideCustomCategories: false }));
     setShowImportSheet(false);
@@ -2496,11 +2589,14 @@ function App() {
                         </motion.button>
                       </motion.div>
 
-                      {/* Custom categories aren't split into easy/hard, so difficulty folds away.
+                      {/* A custom category with one word list has no easy/hard, so difficulty folds away.
                       -mt-5 cancels the column gap; the inner pt-5 brings it back while shown. */}
                       <motion.div variants={RISE} className="-mt-5 shrink-0">
                         <AnimatePresence initial={false}>
-                          {!selectedCategoryInfo?.custom && (
+                          {!(
+                            selectedCategoryInfo?.custom &&
+                            selectedCategoryInfo.hard.length === 0
+                          ) && (
                             <motion.div
                               initial={{ height: 0, opacity: 0 }}
                               animate={{ height: "auto", opacity: 1 }}
@@ -3089,7 +3185,11 @@ function App() {
                 disabled={!canSaveDraft}
                 // Shares the category as it stands in the editor, saved or not.
                 onClick={() =>
-                  openShareSheet({ name: draftName, words: editorDraft.words })
+                  openShareSheet({
+                    name: draftName,
+                    words: editorDraft.words,
+                    hard: draftHard,
+                  })
                 }
               >
                 <Share2 className="size-5 stroke-[2.2]" />
@@ -3097,6 +3197,36 @@ function App() {
             }
             footer={
               <div className="flex flex-col gap-3">
+                {editorDraft.levels && (
+                  <div
+                    role="radiogroup"
+                    aria-label="Add words to"
+                    className="flex rounded-full bg-card p-1"
+                  >
+                    {(["easy", "hard"] as const).map((level) => (
+                      <button
+                        key={level}
+                        type="button"
+                        role="radio"
+                        aria-checked={addLevel === level}
+                        // Keep focus (and the keyboard) in the input while switching.
+                        onPointerDown={(event) => event.preventDefault()}
+                        onClick={() => {
+                          haptic.tap();
+                          setAddLevel(level);
+                        }}
+                        className={cn(
+                          "h-9 flex-1 cursor-pointer rounded-full text-sm font-bold transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60",
+                          addLevel === level
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground",
+                        )}
+                      >
+                        {level}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <form
                   className="flex gap-2"
                   onSubmit={(event) => {
@@ -3111,7 +3241,11 @@ function App() {
                     value={wordDraft}
                     autoComplete="off"
                     enterKeyHint="enter"
-                    placeholder="add a word, or paste a list"
+                    placeholder={
+                      editorDraft.levels
+                        ? `add ${addLevel} words`
+                        : "add a word, or paste a list"
+                    }
                     onChange={(event) => setWordDraft(event.target.value)}
                     onFocus={() => setIsWordInputFocused(true)}
                     onBlur={() => setIsWordInputFocused(false)}
@@ -3154,10 +3288,12 @@ function App() {
                     {draftName.length === 0
                       ? "give it a name"
                       : missingWords > 0
-                        ? `add ${missingWords} more word${missingWords === 1 ? "" : "s"}`
-                        : editorDraft.id
-                          ? "save changes"
-                          : "save category"}
+                        ? `add ${missingWords} more ${editorDraft.levels ? "easy " : ""}word${missingWords === 1 ? "" : "s"}`
+                        : missingHardWords > 0
+                          ? `add ${missingHardWords} more hard word${missingHardWords === 1 ? "" : "s"}`
+                          : editorDraft.id
+                            ? "save changes"
+                            : "save category"}
                   </Button>
                 )}
               </div>
@@ -3188,65 +3324,102 @@ function App() {
                 />
               </section>
 
-              <section className="flex flex-col gap-2.5">
-                <div className="flex items-baseline justify-between px-1">
-                  <span className="text-[13px] font-semibold text-muted-foreground">
-                    Words
-                  </span>
-                  <span className="text-[13px] text-muted-foreground tabular-nums">
-                    <RollingNumber value={editorDraft.words.length} />
-                  </span>
-                </div>
-                {editorDraft.words.length === 0 ? (
-                  <p className="rounded-[24px] bg-card px-[18px] py-4 text-[15px] text-muted-foreground">
-                    No words yet. Type them below, one at a time, or paste a
-                    whole list. You need at least {MIN_CUSTOM_WORDS}.
-                  </p>
-                ) : (
-                  <ol className="flex flex-col rounded-[24px] bg-card pr-1.5 pl-[18px]">
-                    <AnimatePresence initial={false}>
-                      {editorDraft.words.map((word, index) => (
-                        <motion.li
-                          key={word}
-                          layout="position"
-                          // Enters at full height so the list can scroll to it right away.
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0, height: "auto" }}
-                          exit={{ opacity: 0, height: 0 }}
-                          transition={SPRING}
-                          className="overflow-hidden border-b border-border/70 last:border-b-0"
-                        >
-                          <div className="flex min-h-[52px] items-center gap-3 py-1">
-                            <span className="w-5 shrink-0 text-[13px] text-muted-foreground tabular-nums">
-                              {index + 1}
-                            </span>
-                            <span className="min-w-0 flex-1 text-base leading-snug [overflow-wrap:anywhere]">
-                              {word}
-                            </span>
-                            <button
-                              type="button"
-                              aria-label={`Remove ${word}`}
-                              onClick={() => {
-                                haptic.tap();
-                                setEditorDraft((draft) => ({
-                                  ...draft,
-                                  words: draft.words.filter(
-                                    (item) => item !== word,
-                                  ),
-                                }));
-                              }}
-                              className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
+              <div className="rounded-[24px] bg-card px-[18px]">
+                <SettingRow
+                  id="custom-category-levels"
+                  title="Easy and hard words"
+                >
+                  <Switch
+                    id="custom-category-levels"
+                    checked={editorDraft.levels}
+                    onCheckedChange={setDraftLevels}
+                  />
+                </SettingRow>
+              </div>
+
+              {(editorDraft.levels
+                ? (["words", "hard"] as const)
+                : (["words"] as const)
+              ).map((field) => {
+                const list = editorDraft[field];
+                const level = field === "hard" ? "hard" : "easy";
+                return (
+                  <section key={field} className="flex flex-col gap-2.5">
+                    <div className="flex items-baseline justify-between px-1">
+                      <span className="text-[13px] font-semibold text-muted-foreground">
+                        {editorDraft.levels
+                          ? field === "hard"
+                            ? "Hard"
+                            : "Easy"
+                          : "Words"}
+                      </span>
+                      <span className="text-[13px] text-muted-foreground tabular-nums">
+                        <RollingNumber value={list.length} />
+                      </span>
+                    </div>
+                    {list.length === 0 ? (
+                      <p className="rounded-[24px] bg-card px-[18px] py-4 text-[15px] text-muted-foreground">
+                        {editorDraft.levels
+                          ? `No ${level} words yet.`
+                          : `No words yet. Type them below, one at a time, or paste a whole list. You need at least ${MIN_CUSTOM_WORDS}.`}
+                      </p>
+                    ) : (
+                      <ol className="flex flex-col rounded-[24px] bg-card pr-1.5 pl-[18px]">
+                        <AnimatePresence initial={false}>
+                          {list.map((word, index) => (
+                            <motion.li
+                              key={word}
+                              layout="position"
+                              // Enters at full height so the list can scroll to it right away.
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0, height: "auto" }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={SPRING}
+                              className="overflow-hidden border-b border-border/70 last:border-b-0"
                             >
-                              <X className="size-4" />
-                            </button>
-                          </div>
-                        </motion.li>
-                      ))}
-                    </AnimatePresence>
-                  </ol>
-                )}
-                <div ref={editorListEnd} />
-              </section>
+                              <div className="flex min-h-[52px] items-center gap-3 py-1">
+                                <span className="w-5 shrink-0 text-[13px] text-muted-foreground tabular-nums">
+                                  {index + 1}
+                                </span>
+                                <span className="min-w-0 flex-1 text-base leading-snug [overflow-wrap:anywhere]">
+                                  {word}
+                                </span>
+                                {editorDraft.levels && (
+                                  <button
+                                    type="button"
+                                    aria-label={`Move ${word} to ${field === "hard" ? "easy" : "hard"}`}
+                                    onClick={() => moveDraftWord(field, word)}
+                                    className="-mr-3 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
+                                  >
+                                    {field === "hard" ? (
+                                      <ArrowUp className="size-4" />
+                                    ) : (
+                                      <ArrowDown className="size-4" />
+                                    )}
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  aria-label={`Remove ${word}`}
+                                  onClick={() => removeDraftWord(field, word)}
+                                  className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
+                                >
+                                  <X className="size-4" />
+                                </button>
+                              </div>
+                            </motion.li>
+                          ))}
+                        </AnimatePresence>
+                      </ol>
+                    )}
+                    {/* New words scroll into view in the list they're added to. */}
+                    {(field === "hard") ===
+                      (editorDraft.levels && addLevel === "hard") && (
+                      <div ref={editorListEnd} />
+                    )}
+                  </section>
+                );
+              })}
             </div>
           </Page>
 
@@ -3551,7 +3724,9 @@ function App() {
                   {shareCategory?.name}
                 </span>
                 <span className="text-sm text-muted-foreground">
-                  {shareCategory?.words.length} words
+                  {(shareCategory?.words.length ?? 0) +
+                    (shareCategory?.hard.length ?? 0)}{" "}
+                  words
                 </span>
               </div>
             </div>
@@ -3619,7 +3794,7 @@ function App() {
                     {incoming.name}
                   </span>
                   <span className="text-sm text-muted-foreground">
-                    {incoming.words.length} words
+                    {incoming.words.length + incoming.hard.length} words
                   </span>
                 </div>
                 <div className="flex flex-col gap-2">
