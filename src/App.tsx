@@ -503,10 +503,9 @@ type BackLayer =
   | "category"
   | "info";
 
-// A category arriving from a share link. "renamedFrom" is set when you already have a
-// different category with its name, so it gets a number.
+// A category arriving from a share link, already numbered if you have one with its name.
 type IncomingCategory =
-  | { status: "ok"; name: string; words: string[]; renamedFrom?: string }
+  | { status: "ok"; name: string; words: string[] }
   | { status: "duplicate"; name: string }
   | { status: "newer" | "invalid" };
 
@@ -1703,14 +1702,8 @@ function App() {
       showIncoming({ status: "duplicate", name: duplicate.name });
       return;
     }
-    const freeName = freeCategoryName(name);
     haptic.press();
-    showIncoming({
-      status: "ok",
-      name: freeName,
-      words,
-      renamedFrom: freeName === name ? undefined : name,
-    });
+    showIncoming({ status: "ok", name: freeCategoryName(name), words });
   };
 
   // Opened from a share link: in the browser it's in the address bar, in the app it arrives
@@ -3379,16 +3372,9 @@ function App() {
                   }}
                   className="h-12 bg-secondary text-base"
                 />
-                <p
-                  className={cn(
-                    "px-1 text-sm",
-                    linkError ? "text-pink" : "text-muted-foreground",
-                  )}
-                >
-                  {linkError
-                    ? "That isn’t a category link. Copy the whole link and try again."
-                    : "Paste the link someone sent you. The whole message is fine too."}
-                </p>
+                {linkError && (
+                  <p className="px-1 text-sm text-pink">Invalid link.</p>
+                )}
                 <Button
                   type="submit"
                   size="lg"
@@ -3418,28 +3404,23 @@ function App() {
                     scanStatus === "unavailable") && (
                     <div className="absolute inset-0 flex items-center justify-center bg-secondary p-6 text-center text-[15px] text-muted-foreground">
                       {scanStatus === "denied"
-                        ? "Camera access is turned off for Imposter. Allow it in your settings, or paste the link instead."
-                        : "The camera couldn’t start. Paste the link instead."}
+                        ? "Camera access denied."
+                        : "Camera unavailable."}
                     </div>
                   )}
                 </div>
-                <p
-                  className={cn(
-                    "text-center text-sm",
-                    scannedOtherCode ? "text-pink" : "text-muted-foreground",
-                  )}
-                >
-                  {scannedOtherCode
-                    ? "That QR code isn’t an Imposter category."
-                    : "Point the camera at the QR code on the other phone."}
-                </p>
+                {scannedOtherCode && (
+                  <p className="text-center text-sm text-pink">
+                    Not a category QR code.
+                  </p>
+                )}
                 {(scanStatus === "denied" || scanStatus === "unavailable") && (
                   <Button
                     size="lg"
                     className="h-14 w-full text-[17px]"
                     onClick={() => openAddMode("link")}
                   >
-                    paste a link instead
+                    paste a link
                   </Button>
                 )}
               </div>
@@ -3493,8 +3474,7 @@ function App() {
                   {shareCategory?.name}
                 </span>
                 <span className="text-sm text-muted-foreground">
-                  {shareCategory?.words.length} words · scan with a phone camera
-                  to add it
+                  {shareCategory?.words.length} words
                 </span>
               </div>
             </div>
@@ -3541,7 +3521,7 @@ function App() {
                       ? "already added"
                       : incoming.status === "newer"
                         ? "update needed"
-                        : "this link doesn’t work"}
+                        : "invalid link"}
                 </h2>
                 <Button
                   variant="ghost"
@@ -3563,8 +3543,6 @@ function App() {
                   </span>
                   <span className="text-sm text-muted-foreground">
                     {incoming.words.length} words
-                    {incoming.renamedFrom &&
-                      ` · you already have a “${incoming.renamedFrom}”, so this one gets a number`}
                   </span>
                 </div>
                 <div className="flex flex-col gap-2">
@@ -3586,22 +3564,13 @@ function App() {
                 </div>
               </>
             ) : (
-              <>
-                <p className="text-[15px] leading-relaxed text-muted-foreground">
-                  {incoming.status === "duplicate"
-                    ? `You already have “${incoming.name}” with the same words.`
-                    : incoming.status === "newer"
-                      ? "This category was shared from a newer version of Imposter. Update the app, then open the link again."
-                      : "It might have been cut off when it was copied. Ask for the link again."}
-                </p>
-                <Button
-                  size="lg"
-                  className="h-14 w-full text-[17px]"
-                  onClick={() => setShowImportSheet(false)}
-                >
-                  ok
-                </Button>
-              </>
+              <Button
+                size="lg"
+                className="h-14 w-full text-[17px]"
+                onClick={() => setShowImportSheet(false)}
+              >
+                ok
+              </Button>
             )}
           </Sheet>
 

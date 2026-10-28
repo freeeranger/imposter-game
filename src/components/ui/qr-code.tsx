@@ -35,7 +35,7 @@ function QrCode({ value, label, className }: QrCodeProps) {
           className,
         )}
       >
-        Too many words for a QR code. Send the link instead.
+        Too many words for a QR code.
       </div>
     );
   }
