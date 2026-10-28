@@ -3638,7 +3638,7 @@ function App() {
 
             {addMode === "scan" && (
               <div className="flex flex-col items-center gap-4 pb-2">
-                <div className="relative aspect-square w-full max-w-[272px] overflow-hidden rounded-[24px] bg-black">
+                <div className="relative aspect-square w-full max-w-[272px] overflow-hidden rounded-[24px] bg-secondary">
                   {/* Android's web view draws a grey play-button placeholder until the first
                       frame; a blank poster and staying hidden until the camera runs avoid it. */}
                   <video
@@ -3653,7 +3653,7 @@ function App() {
                   />
                   {scanStatus === "starting" && (
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <Loader2 className="size-6 animate-spin text-white/70" />
+                      <Loader2 className="size-6 animate-spin text-muted-foreground" />
                     </div>
                   )}
                   {(scanStatus === "denied" ||
