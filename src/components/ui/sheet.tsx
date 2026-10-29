@@ -97,7 +97,10 @@ function Sheet({
             dragListener={false}
             dragControls={dragControls}
             dragConstraints={{ top: 0, bottom: 0 }}
-            dragElastic={{ top: 0.04, bottom: 1 }}
+            // Upward it rubber-bands a little (it can't grow); downward it follows the finger.
+            dragElastic={{ top: 0.14, bottom: 1 }}
+            // Settle back without bouncing past the rest position after a fast swipe.
+            dragTransition={{ bounceStiffness: 600, bounceDamping: 48 }}
             onDragEnd={(_, info) => {
               if (
                 info.offset.y > DISMISS_OFFSET ||
@@ -124,6 +127,12 @@ function Sheet({
               {header}
             </div>
             {children}
+            {/* Sheet-coloured skirt below the bottom edge, so a swipe up never lifts the
+                sheet off the screen's bottom and shows what's behind it. */}
+            <div
+              aria-hidden="true"
+              className="absolute inset-x-0 top-full h-[50vh] bg-card lg:hidden"
+            />
           </motion.div>
           </motion.div>
         </div>
