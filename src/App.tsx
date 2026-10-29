@@ -18,6 +18,8 @@ import { Page } from "@/components/ui/page";
 import { QrCode } from "@/components/ui/qr-code";
 import { Sheet } from "@/components/ui/sheet";
 import { SplashReveal } from "@/components/splash-reveal";
+import { SplashPrototypes } from "@/components/splash-prototypes";
+import type { SplashPrototype } from "@/components/splash-prototypes";
 import { Switch } from "@/components/ui/switch";
 import {
   AnimatePresence,
@@ -141,10 +143,15 @@ const CATEGORIES: Record<string, Category> = Object.fromEntries(
 
 const APP_VERSION = __APP_VERSION__;
 
-// Dev only: add ?splash to the URL to watch the launch in a browser.
-const PREVIEW_SPLASH =
-  import.meta.env.DEV &&
-  new URLSearchParams(window.location.search).has("splash");
+// Dev only: add ?splash to the URL to watch the launch in a browser, or ?splash=button,
+// blink, squash or ripple for one of the prototypes.
+const SPLASH_PREVIEW = import.meta.env.DEV
+  ? new URLSearchParams(window.location.search).get("splash")
+  : null;
+const PREVIEW_SPLASH = SPLASH_PREVIEW !== null;
+const SPLASH_PROTOTYPE = (
+  ["button", "blink", "squash", "ripple"] as const
+).find((name) => name === SPLASH_PREVIEW) as SplashPrototype | undefined;
 
 const CATEGORY_KEYS = Object.keys(CATEGORIES);
 const DEFAULT_CATEGORY = CATEGORY_KEYS[0] ?? "random";
@@ -2100,6 +2107,8 @@ function App() {
     <Button
       onClick={primaryAction}
       size="lg"
+      // The launch animation lands on this button.
+      data-launch-target
       // Below 360px "hide & pass to player 20" needs smaller type to fit.
       className="relative w-full overflow-hidden max-[359px]:px-4 max-[359px]:text-[15px]"
       disabled={primaryDisabled}
@@ -2321,13 +2330,21 @@ function App() {
   return (
     <PredictiveBackContext.Provider value={predictiveBackValues}>
       <MotionConfig reducedMotion="user">
-        {showSplashReveal && (
-          <SplashReveal
-            play={isSplashReady}
-            onOpen={() => setHasLaunched(true)}
-            onDone={() => setShowSplashReveal(false)}
-          />
-        )}
+        {showSplashReveal &&
+          (SPLASH_PROTOTYPE ? (
+            <SplashPrototypes
+              variant={SPLASH_PROTOTYPE}
+              play={isSplashReady}
+              onOpen={() => setHasLaunched(true)}
+              onDone={() => setShowSplashReveal(false)}
+            />
+          ) : (
+            <SplashReveal
+              play={isSplashReady}
+              onOpen={() => setHasLaunched(true)}
+              onDone={() => setShowSplashReveal(false)}
+            />
+          ))}
         <div className="relative flex h-dvh w-full justify-center overflow-hidden bg-background text-foreground transition-colors select-none">
           <div className="flex h-full w-full max-w-md flex-col px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] pl-[max(1.25rem,env(safe-area-inset-left))] pr-[max(1.25rem,env(safe-area-inset-right))] lg:max-w-6xl lg:pt-8 lg:pr-12 lg:pb-10 lg:pl-12">
             {/* Top bar: stays put while the content below changes */}
