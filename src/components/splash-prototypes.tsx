@@ -209,7 +209,7 @@ function SplashPrototypes({
     // after it and overshoot a little, so the edge wobbles on its way off the top.
     const pullCurtain = () =>
       new Promise<void>((resolve) => {
-        const lift = 0.62;
+        const lift = 0.42;
         const top = -height * 0.35;
         let middle = height;
         let side = height;
@@ -232,10 +232,11 @@ function SplashPrototypes({
           last = now;
           elapsed += dt;
           const t = Math.min(1, elapsed / lift);
-          const eased = t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+          // Accelerates all the way out: a gentle start, then it whips off the top.
+          const eased = t ** 2.4;
           const previous = middle;
           middle = lerp(height, top, eased);
-          sideSpeed += (240 * (middle - side) - 17 * sideSpeed) * dt;
+          sideSpeed += (420 * (middle - side) - 24 * sideSpeed) * dt;
           side += sideSpeed * dt;
           // Pulled taut: the middle can't get more than this far ahead, it drags the sides.
           const slack = width * 0.45;
@@ -273,7 +274,7 @@ function SplashPrototypes({
           animate(
             mask,
             { y: -height * 0.8, scaleY: 1.35, scaleX: 0.84 },
-            { duration: 0.5, ease: [0.4, 0, 0.7, 0.4] },
+            { duration: 0.4, ease: [0.5, 0, 0.9, 0.3] },
           ),
         ),
         pullCurtain(),
