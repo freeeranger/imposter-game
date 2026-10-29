@@ -44,9 +44,9 @@ function Page({
   const back = usePredictiveBack();
   const idleProgress = useMotionValue(0);
   const progress = back?.progress ?? idleProgress;
-  // The back swipe scrubs the page's own exit: it slides right with the swipe, and letting
-  // go finishes the slide from there.
-  const x = useTransform(progress, [0, 1], ["0%", "100%"]);
+  // The back swipe previews the page's own exit: it slides right a little with the swipe
+  // (like sheets sink a little), and letting go finishes the slide from there.
+  const x = useTransform(progress, [0, 1], ["0%", "24%"]);
 
   return (
     <AnimatePresence>
