@@ -204,6 +204,56 @@ function SplashPrototypes({
       await track(animate(part("pill"), { opacity: 0 }, { duration: 0.18 }));
     };
 
+    // The dark curtain behaves like fabric: the middle of its bottom edge is dragged up
+    // behind the jumping mask, while the sides are springs that hang back, get yanked
+    // after it and overshoot a little, so the edge wobbles on its way off the top.
+    const pullCurtain = () =>
+      new Promise<void>((resolve) => {
+        const lift = 0.62;
+        const top = -height * 0.35;
+        let middle = height;
+        let side = height;
+        let sideSpeed = 0;
+        let elapsed = 0;
+        let last = performance.now();
+        let frame = 0;
+        const draw = () => {
+          set("backdrop", {
+            d:
+              `M0 ${-height}H${width}V${side}` +
+              // A rounded bell: soft shoulders at the sides, a broad top in the middle.
+              `C${width * 0.8} ${side} ${width * 0.72} ${middle} ${width / 2} ${middle}` +
+              `C${width * 0.28} ${middle} ${width * 0.2} ${side} 0 ${side}Z`,
+          });
+        };
+        const step = (now: number) => {
+          // Small steps keep the spring steady even if a frame comes late.
+          const dt = Math.min(0.032, (now - last) / 1000);
+          last = now;
+          elapsed += dt;
+          const t = Math.min(1, elapsed / lift);
+          const eased = t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+          const previous = middle;
+          middle = lerp(height, top, eased);
+          sideSpeed += (240 * (middle - side) - 17 * sideSpeed) * dt;
+          side += sideSpeed * dt;
+          // Pulled taut: the middle can't get more than this far ahead, it drags the sides.
+          const slack = width * 0.45;
+          if (side - middle > slack) {
+            side = middle + slack;
+            sideSpeed = dt > 0 ? (middle - previous) / dt : sideSpeed;
+          }
+          draw();
+          if (cancelled || (middle <= top && side < -40) || elapsed > 1.8) {
+            resolve();
+          } else {
+            frame = requestAnimationFrame(step);
+          }
+        };
+        frame = requestAnimationFrame(step);
+        track({ stop: () => cancelAnimationFrame(frame) });
+      });
+
     const squash = async () => {
       const mask = part("mask");
       mask.style.transformOrigin = "50% 100%";
@@ -226,17 +276,7 @@ function SplashPrototypes({
             { duration: 0.5, ease: [0.4, 0, 0.7, 0.4] },
           ),
         ),
-        tween(
-          { duration: 0.62, delay: 0.03, ease: [0.45, 0, 0.55, 1] },
-          (p) => {
-            const edge = height * (1 - p * 1.35);
-            // The middle leads, the sides trail behind.
-            const pull = Math.sin(Math.PI * p) * height * 0.22;
-            set("backdrop", {
-              d: `M0 ${-height}H${width}V${edge}Q${width / 2} ${edge - 2 * pull} 0 ${edge}Z`,
-            });
-          },
-        ),
+        pullCurtain(),
       ]);
     };
 
