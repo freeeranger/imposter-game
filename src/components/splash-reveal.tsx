@@ -13,23 +13,68 @@ const RIGHT_EYE = "M14.1,11.2a2.5,1.35 0 1,0 5,0a2.5,1.35 0 1,0 -5,0z";
 const SPLASH_BACKGROUND = "#15111f";
 const PINK = "#FF4FA3";
 
-// The crack zigzags this far sideways at each step, starting small inside the mask.
-const CRACK_OFFSETS = [0, -4, 5, -9, 12, -7, 14, -11, 8, -15, 10, -6, 13, -9];
-const CRACK_STEP = 38;
+type Point = [number, number];
 
-// Points of the crack from the middle of the screen out to one edge (direction -1 is up).
-const crackPoints = (width: number, height: number, direction: 1 | -1) => {
-  const points: [number, number][] = [];
-  for (let step = 0; ; step += 1) {
-    const y = height / 2 + direction * step * CRACK_STEP;
-    const x =
-      width / 2 + (CRACK_OFFSETS[step % CRACK_OFFSETS.length] ?? 0) * direction;
-    points.push([x, y]);
-    if (y < -CRACK_STEP || y > height + CRACK_STEP) return points;
+// Between the eyes the crack stays tight so the mask splits cleanly; past this distance
+// from the middle it's free to wander.
+const MASK_REACH = 52;
+
+// One run of the crack from the middle of the screen out past one edge (direction -1 is up):
+// uneven steps, sharp jags, and a sideways drift that sweeps it across the screen.
+const crackRun = (width: number, height: number, direction: 1 | -1) => {
+  const points: Point[] = [[width / 2, height / 2]];
+  const maxDrift = width * 0.2;
+  let drift = 0;
+  let y = height / 2;
+  while (y > -40 && y < height + 40) {
+    y += direction * (14 + Math.random() * 42);
+    const reach = Math.abs(y - height / 2);
+    if (reach < MASK_REACH) {
+      points.push([width / 2 + (Math.random() - 0.5) * 8, y]);
+      continue;
+    }
+    const freedom = Math.min(1, (reach - MASK_REACH) / 90);
+    drift += (Math.random() - 0.5) * 70 * freedom;
+    drift = Math.max(-maxDrift, Math.min(maxDrift, drift));
+    const jag = (Math.random() - 0.5) * 26 * freedom;
+    points.push([width / 2 + drift + jag, y]);
   }
+  return points;
 };
 
-const toPath = (points: [number, number][]) =>
+// Short side cracks splitting off the main one, out into one of the halves.
+const crackForks = (runs: Point[][]) =>
+  runs.flatMap((run) =>
+    run
+      .filter(
+        ([, y], index) =>
+          index > 2 && index < run.length - 2 && Math.random() < 0.22 && y > 0,
+      )
+      .map(([x, y]) => {
+        const side = Math.random() < 0.5 ? -1 : 1;
+        const lean = Math.sign(y - run[0][1]) || 1;
+        const fork: Point[] = [[x, y]];
+        let [fx, fy] = [x, y];
+        for (
+          let step = 0;
+          step < 2 + Math.floor(Math.random() * 3);
+          step += 1
+        ) {
+          fx += side * (10 + Math.random() * 22);
+          fy += lean * (4 + Math.random() * 18);
+          fork.push([fx, fy]);
+        }
+        return fork;
+      }),
+  );
+
+const makeCrack = (width: number, height: number) => {
+  const up = crackRun(width, height, -1);
+  const down = crackRun(width, height, 1);
+  return { up, down, forks: crackForks([up, down]) };
+};
+
+const toPath = (points: Point[]) =>
   points.map(([x, y], index) => `${index ? "L" : "M"}${x} ${y}`).join("");
 
 type SplashRevealProps = {
@@ -53,9 +98,16 @@ function SplashReveal({ play, onOpen, onDone }: SplashRevealProps) {
     height: window.innerHeight,
   }));
 
+  // A new crack every launch.
+  const [crack, setCrack] = useState(() =>
+    makeCrack(window.innerWidth, window.innerHeight),
+  );
+
   useEffect(() => {
-    const handleResize = () =>
+    const handleResize = () => {
       setSize({ width: window.innerWidth, height: window.innerHeight });
+      setCrack(makeCrack(window.innerWidth, window.innerHeight));
+    };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
@@ -99,14 +151,24 @@ function SplashReveal({ play, onOpen, onDone }: SplashRevealProps) {
       ]);
       if (cancelled) return;
 
-      // The crack starts between the eyes and races to the top and bottom of the screen.
-      await track(
-        animate(
-          parts("crack"),
-          { strokeDashoffset: [1, 0] },
-          { duration: 0.2, ease: [0.5, 0, 1, 1] },
+      // The crack starts between the eyes and races to the top and bottom of the screen,
+      // splintering off to the sides as it goes.
+      await Promise.all([
+        track(
+          animate(
+            parts("crack"),
+            { strokeDashoffset: [1, 0] },
+            { duration: 0.22, ease: [0.5, 0, 1, 1] },
+          ),
         ),
-      );
+        track(
+          animate(
+            parts("fork"),
+            { strokeDashoffset: [1, 0] },
+            { duration: 0.08, delay: 0.14, ease: "easeOut" },
+          ),
+        ),
+      ]);
       if (cancelled) return;
 
       // It breaks: the screen jolts, the halves snap a few pixels apart and hang there...
@@ -167,8 +229,7 @@ function SplashReveal({ play, onOpen, onDone }: SplashRevealProps) {
   }, [play, reduceMotion, size]);
 
   const { width, height } = size;
-  const up = crackPoints(width, height, -1);
-  const down = crackPoints(width, height, 1);
+  const { up, down, forks } = crack;
   // The crack from top to bottom, which is the edge between the two halves.
   const crackLine = [...up].reverse().concat(down.slice(1));
   const leftHalf = [[-width, -height], ...crackLine, [-width, height * 2]];
@@ -218,7 +279,7 @@ function SplashReveal({ play, onOpen, onDone }: SplashRevealProps) {
             </g>
           </g>
         </g>
-        {/* Each half shows its side of the pink crack. */}
+        {/* Each half shows its side of the pink crack, and the forks on its side. */}
         {[up, down].map((points, index) => (
           <path
             key={index}
@@ -227,6 +288,21 @@ function SplashReveal({ play, onOpen, onDone }: SplashRevealProps) {
             fill="none"
             stroke={PINK}
             strokeWidth={4}
+            strokeLinejoin="round"
+            pathLength={1}
+            strokeDasharray="1 1"
+            strokeDashoffset={1}
+          />
+        ))}
+        {forks.map((points, index) => (
+          <path
+            key={index}
+            data-part="fork"
+            d={toPath(points)}
+            fill="none"
+            stroke={PINK}
+            strokeWidth={2.5}
+            strokeLinecap="round"
             strokeLinejoin="round"
             pathLength={1}
             strokeDasharray="1 1"
