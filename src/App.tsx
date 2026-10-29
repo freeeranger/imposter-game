@@ -18,7 +18,6 @@ import { Page } from "@/components/ui/page";
 import { QrCode } from "@/components/ui/qr-code";
 import { Sheet } from "@/components/ui/sheet";
 import { SplashReveal } from "@/components/splash-reveal";
-import type { SplashVariant } from "@/components/splash-reveal";
 import { Switch } from "@/components/ui/switch";
 import {
   AnimatePresence,
@@ -142,13 +141,10 @@ const CATEGORIES: Record<string, Category> = Object.fromEntries(
 
 const APP_VERSION = __APP_VERSION__;
 
-// Dev only: add ?splash (or ?splash=glance) to the URL to watch the launch in a browser.
-const SPLASH_PREVIEW = import.meta.env.DEV
-  ? new URLSearchParams(window.location.search).get("splash")
-  : null;
-const PREVIEW_SPLASH = SPLASH_PREVIEW !== null;
-const SPLASH_VARIANT: SplashVariant =
-  SPLASH_PREVIEW === "glance" ? "glance" : "split";
+// Dev only: add ?splash to the URL to watch the launch in a browser.
+const PREVIEW_SPLASH =
+  import.meta.env.DEV &&
+  new URLSearchParams(window.location.search).has("splash");
 const HAS_SPLASH = isNativeApp || PREVIEW_SPLASH;
 
 const CATEGORY_KEYS = Object.keys(CATEGORIES);
@@ -2299,7 +2295,6 @@ function App() {
       <MotionConfig reducedMotion="user">
         {showSplashReveal && (
           <SplashReveal
-            variant={SPLASH_VARIANT}
             play={isSplashReady}
             onOpen={() => setHasLaunched(true)}
             onDone={() => setShowSplashReveal(false)}
