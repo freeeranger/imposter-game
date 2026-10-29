@@ -17,7 +17,12 @@ const PINK = "#FF4FA3";
 const MASK_WIDTH = 150;
 const MASK_HEIGHT = 97.5;
 
-export type SplashPrototype = "button" | "blink" | "squash" | "ripple";
+export type SplashPrototype =
+  | "button"
+  | "blink"
+  | "squash"
+  | "ripple"
+  | "winkjump";
 
 const OWN_CENTER = {
   transformBox: "fill-box",
@@ -235,6 +240,28 @@ function SplashPrototypes({
       ]);
     };
 
+    // The wink from "blink" as the wind-up, then the jump from "squash".
+    const winkJump = async () => {
+      await Promise.all([
+        track(
+          animate(
+            part("eye-right"),
+            { scaleY: [1, 0.08, 0.08, 1] },
+            { duration: 0.34, times: [0, 0.3, 0.6, 1] },
+          ),
+        ),
+        track(
+          animate(
+            part("mask"),
+            { rotate: [0, -9, 0] },
+            { duration: 0.4, ease: "easeInOut" },
+          ),
+        ),
+      ]);
+      if (cancelled) return;
+      await squash();
+    };
+
     const ripple = async () => {
       const center = { x: width / 2, y: height / 2 };
       const reach = Math.hypot(width, height) / 2 + 30;
@@ -286,6 +313,7 @@ function SplashPrototypes({
         await track(animate(root, { opacity: 0 }, { duration: 0.25 }));
       } else if (variant === "button") await button();
       else if (variant === "squash") await squash();
+      else if (variant === "winkjump") await winkJump();
       else if (variant === "ripple") await ripple();
       else await blink();
       if (!cancelled) finish();

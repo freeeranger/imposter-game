@@ -150,7 +150,7 @@ const SPLASH_PREVIEW = import.meta.env.DEV
   : null;
 const PREVIEW_SPLASH = SPLASH_PREVIEW !== null;
 const SPLASH_PROTOTYPE = (
-  ["button", "blink", "squash", "ripple"] as const
+  ["button", "blink", "squash", "ripple", "winkjump"] as const
 ).find((name) => name === SPLASH_PREVIEW) as SplashPrototype | undefined;
 
 const CATEGORY_KEYS = Object.keys(CATEGORIES);
