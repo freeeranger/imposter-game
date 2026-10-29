@@ -18,6 +18,7 @@ import { Page } from "@/components/ui/page";
 import { QrCode } from "@/components/ui/qr-code";
 import { Sheet } from "@/components/ui/sheet";
 import { SplashReveal } from "@/components/splash-reveal";
+import type { SplashVariant } from "@/components/splash-reveal";
 import { Switch } from "@/components/ui/switch";
 import {
   AnimatePresence,
@@ -141,10 +142,13 @@ const CATEGORIES: Record<string, Category> = Object.fromEntries(
 
 const APP_VERSION = __APP_VERSION__;
 
-// Dev only: add ?splash to the URL to watch the app's launch reveal in a browser.
-const PREVIEW_SPLASH =
-  import.meta.env.DEV &&
-  new URLSearchParams(window.location.search).has("splash");
+// Dev only: add ?splash (or ?splash=glance) to the URL to watch the launch in a browser.
+const SPLASH_PREVIEW = import.meta.env.DEV
+  ? new URLSearchParams(window.location.search).get("splash")
+  : null;
+const PREVIEW_SPLASH = SPLASH_PREVIEW !== null;
+const SPLASH_VARIANT: SplashVariant =
+  SPLASH_PREVIEW === "glance" ? "glance" : "split";
 const HAS_SPLASH = isNativeApp || PREVIEW_SPLASH;
 
 const CATEGORY_KEYS = Object.keys(CATEGORIES);
@@ -996,15 +1000,17 @@ function App() {
 
   // Until the splash starts leaving, render nothing so the entrance animation is actually seen.
   const [hasLaunched, setHasLaunched] = useState<boolean>(!HAS_SPLASH);
-  // The mask from the native splash, which then opens up onto the app.
+  // The mask from the native splash takes over and acts out its exit; the app animates
+  // in once the mask starts leaving.
   const [showSplashReveal, setShowSplashReveal] = useState<boolean>(HAS_SPLASH);
+  const [isSplashReady, setIsSplashReady] = useState<boolean>(false);
   const isDesktop = useIsDesktop();
   useEffect(() => {
     if (PREVIEW_SPLASH) {
-      const timer = window.setTimeout(() => setHasLaunched(true), 800);
+      const timer = window.setTimeout(() => setIsSplashReady(true), 800);
       return () => window.clearTimeout(timer);
     }
-    hideSplashScreen(() => setHasLaunched(true));
+    hideSplashScreen(() => setIsSplashReady(true));
   }, []);
 
   useEffect(() => {
@@ -2293,7 +2299,9 @@ function App() {
       <MotionConfig reducedMotion="user">
         {showSplashReveal && (
           <SplashReveal
-            play={hasLaunched}
+            variant={SPLASH_VARIANT}
+            play={isSplashReady}
+            onOpen={() => setHasLaunched(true)}
             onDone={() => setShowSplashReveal(false)}
           />
         )}
