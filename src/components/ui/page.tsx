@@ -43,13 +43,10 @@ function Page({
   const isDesktop = useIsDesktop();
   const back = usePredictiveBack();
   const idleProgress = useMotionValue(0);
-  const idleEdge = useMotionValue(1);
   const progress = back?.progress ?? idleProgress;
-  const edge = back?.edge ?? idleEdge;
-  // Material-style preview: shrink, drift toward the swipe, round the corners.
-  const scale = useTransform(progress, [0, 1], [1, 0.9]);
-  const x = useTransform(() => progress.get() * edge.get() * 24);
-  const borderRadius = useTransform(progress, [0, 1], [0, 32]);
+  // The back swipe scrubs the page's own exit: it slides right with the swipe, and letting
+  // go finishes the slide from there.
+  const x = useTransform(progress, [0, 1], ["0%", "100%"]);
 
   return (
     <AnimatePresence>
@@ -95,7 +92,7 @@ function Page({
           )}
         >
           <motion.div
-            style={predictive ? { scale, x, borderRadius } : undefined}
+            style={predictive ? { x } : undefined}
             className="absolute inset-0 flex justify-center overflow-hidden bg-background text-foreground shadow-[-16px_0_40px_rgb(0_0_0/0.35)] lg:rounded-l-[32px] lg:border-l-[1.5px] lg:border-border"
           >
             <div
