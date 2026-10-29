@@ -145,7 +145,6 @@ const APP_VERSION = __APP_VERSION__;
 const PREVIEW_SPLASH =
   import.meta.env.DEV &&
   new URLSearchParams(window.location.search).has("splash");
-const HAS_SPLASH = isNativeApp || PREVIEW_SPLASH;
 
 const CATEGORY_KEYS = Object.keys(CATEGORIES);
 const DEFAULT_CATEGORY = CATEGORY_KEYS[0] ?? "random";
@@ -475,6 +474,7 @@ type PlayerAssignment = {
 
 const THEME_STORAGE_KEY = "imposter-game-theme";
 const HAPTICS_STORAGE_KEY = "imposter-game-haptics";
+const LAUNCH_ANIMATION_STORAGE_KEY = "imposter-game-launch-animation";
 const INTERFACE_STORAGE_KEY = "imposter-game-interface";
 
 // Kept apart from game settings so "Reset game settings" leaves them alone.
@@ -994,19 +994,47 @@ function App() {
     }
   });
 
+  const [launchAnimationOn, setLaunchAnimationOn] = useState<boolean>(() => {
+    try {
+      return (
+        window.localStorage.getItem(LAUNCH_ANIMATION_STORAGE_KEY) !== "off"
+      );
+    } catch {
+      return true;
+    }
+  });
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        LAUNCH_ANIMATION_STORAGE_KEY,
+        launchAnimationOn ? "on" : "off",
+      );
+    } catch {
+      // ignore storage write errors (e.g. private mode)
+    }
+  }, [launchAnimationOn]);
+
   // Until the splash starts leaving, render nothing so the entrance animation is actually seen.
-  const [hasLaunched, setHasLaunched] = useState<boolean>(!HAS_SPLASH);
-  // The mask from the native splash takes over and acts out its exit; the app animates
-  // in once the mask starts leaving.
-  const [showSplashReveal, setShowSplashReveal] = useState<boolean>(HAS_SPLASH);
+  const [hasLaunched, setHasLaunched] = useState<boolean>(
+    !isNativeApp && !PREVIEW_SPLASH,
+  );
+  // With the launch animation on, the mask from the native splash takes over and acts out
+  // its exit; the app animates in once the mask starts leaving. Off, the splash just fades.
+  // Decided once at launch, so changing the setting applies from the next one.
+  const [showSplashReveal, setShowSplashReveal] = useState<boolean>(
+    (isNativeApp && launchAnimationOn) || PREVIEW_SPLASH,
+  );
   const [isSplashReady, setIsSplashReady] = useState<boolean>(false);
   const isDesktop = useIsDesktop();
+  const onSplashHidden = useEffectEvent(() =>
+    showSplashReveal ? setIsSplashReady(true) : setHasLaunched(true),
+  );
   useEffect(() => {
     if (PREVIEW_SPLASH) {
       const timer = window.setTimeout(() => setIsSplashReady(true), 800);
       return () => window.clearTimeout(timer);
     }
-    hideSplashScreen(() => setIsSplashReady(true));
+    hideSplashScreen(onSplashHidden);
   }, []);
 
   useEffect(() => {
@@ -4179,13 +4207,20 @@ function App() {
               {isNativeApp && (
                 <motion.section
                   variants={RISE}
-                  className="rounded-[24px] bg-card pr-3 pl-[18px]"
+                  className="flex flex-col divide-y divide-border/70 rounded-[24px] bg-card pr-3 pl-[18px]"
                 >
                   <SettingRow id="haptics" title="Vibrations">
                     <Switch
                       id="haptics"
                       checked={hapticsOn}
                       onCheckedChange={setHapticsOn}
+                    />
+                  </SettingRow>
+                  <SettingRow id="launch-animation" title="Launch animation">
+                    <Switch
+                      id="launch-animation"
+                      checked={launchAnimationOn}
+                      onCheckedChange={setLaunchAnimationOn}
                     />
                   </SettingRow>
                 </motion.section>
