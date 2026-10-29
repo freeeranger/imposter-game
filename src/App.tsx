@@ -17,6 +17,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Page } from "@/components/ui/page";
 import { QrCode } from "@/components/ui/qr-code";
 import { Sheet } from "@/components/ui/sheet";
+import { SplashReveal } from "@/components/splash-reveal";
 import { Switch } from "@/components/ui/switch";
 import {
   AnimatePresence,
@@ -139,6 +140,12 @@ const CATEGORIES: Record<string, Category> = Object.fromEntries(
 );
 
 const APP_VERSION = __APP_VERSION__;
+
+// Dev only: add ?splash to the URL to watch the app's launch reveal in a browser.
+const PREVIEW_SPLASH =
+  import.meta.env.DEV &&
+  new URLSearchParams(window.location.search).has("splash");
+const HAS_SPLASH = isNativeApp || PREVIEW_SPLASH;
 
 const CATEGORY_KEYS = Object.keys(CATEGORIES);
 const DEFAULT_CATEGORY = CATEGORY_KEYS[0] ?? "random";
@@ -988,9 +995,15 @@ function App() {
   });
 
   // Until the splash starts leaving, render nothing so the entrance animation is actually seen.
-  const [hasLaunched, setHasLaunched] = useState<boolean>(!isNativeApp);
+  const [hasLaunched, setHasLaunched] = useState<boolean>(!HAS_SPLASH);
+  // The mask from the native splash, which then opens up onto the app.
+  const [showSplashReveal, setShowSplashReveal] = useState<boolean>(HAS_SPLASH);
   const isDesktop = useIsDesktop();
   useEffect(() => {
+    if (PREVIEW_SPLASH) {
+      const timer = window.setTimeout(() => setHasLaunched(true), 800);
+      return () => window.clearTimeout(timer);
+    }
     hideSplashScreen(() => setHasLaunched(true));
   }, []);
 
@@ -2278,6 +2291,12 @@ function App() {
   return (
     <PredictiveBackContext.Provider value={predictiveBackValues}>
       <MotionConfig reducedMotion="user">
+        {showSplashReveal && (
+          <SplashReveal
+            play={hasLaunched}
+            onDone={() => setShowSplashReveal(false)}
+          />
+        )}
         <div className="relative flex h-dvh w-full justify-center overflow-hidden bg-background text-foreground transition-colors select-none">
           <div className="flex h-full w-full max-w-md flex-col px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] pl-[max(1.25rem,env(safe-area-inset-left))] pr-[max(1.25rem,env(safe-area-inset-right))] lg:max-w-6xl lg:pt-8 lg:pr-12 lg:pb-10 lg:pl-12">
             {/* Top bar: stays put while the content below changes */}
