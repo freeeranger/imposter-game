@@ -51,18 +51,21 @@ function ShareCategorySheet({
       }
     >
       <div className="flex flex-col items-center gap-4 overflow-y-auto">
-        <div className="aspect-square w-full max-w-[272px]">
-          {shareUrl ? (
-            <QrCode
-              className="size-full"
-              value={shareUrl}
-              label={`QR code for ${shareCategory?.name ?? "the category"}`}
-            />
-          ) : (
-            <div className="flex size-full items-center justify-center rounded-[24px] bg-secondary">
-              <Loader2 className="size-6 animate-spin text-muted-foreground" />
-            </div>
-          )}
+        {/* The right and bottom padding leave room for the card's offset shadow. */}
+        <div className="w-full max-w-[280px] pr-2 pb-2">
+          <div className="aspect-square w-full">
+            {shareUrl ? (
+              <QrCode
+                className="size-full"
+                value={shareUrl}
+                label={`QR code for ${shareCategory?.name ?? "the category"}`}
+              />
+            ) : (
+              <div className="flex size-full items-center justify-center rounded-[28px] bg-secondary">
+                <Loader2 className="size-6 animate-spin text-muted-foreground" />
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex flex-col items-center gap-1 text-center">
           <span className="max-w-full font-display text-xl font-extrabold tracking-[-0.02em] [overflow-wrap:anywhere] lowercase">
