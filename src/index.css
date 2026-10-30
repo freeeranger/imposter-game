@@ -15,8 +15,9 @@
 :root {
   --radius: 1.25rem;
 
-  /* Light mode: pale lilac paper with ink text */
-  --background: #f5f1fc;
+  /* Light mode: soft violet-grey paper with ink text. Lime stays a fill only (as text it
+     is unreadable on white), so highlighted words are ink. */
+  --background: #f2f0f6;
   --foreground: #1a1426;
 
   --card: #ffffff;
@@ -25,30 +26,29 @@
   --popover: #ffffff;
   --popover-foreground: #1a1426;
 
-  --primary: #c6ff3d;
+  --primary: #bdf23f;
   --primary-foreground: #15111f;
 
-  /* Lime is unreadable as text on white, so light mode highlights in olive */
-  --highlight: #3f6b00;
+  --highlight: #1a1426;
 
-  --secondary: #ebe4f7;
+  --secondary: #e7e4ee;
   --secondary-foreground: #1a1426;
 
-  --muted: #ebe4f7;
-  --muted-foreground: #5f5675;
+  --muted: #e7e4ee;
+  --muted-foreground: #5c566a;
 
-  --accent: #ebe4f7;
+  --accent: #e7e4ee;
   --accent-foreground: #1a1426;
 
-  /* Hot pink, darkened in light mode so pink text stays readable */
-  --pink: #d1206f;
-  --pink-foreground: #ffffff;
+  /* Hot pink, a touch deeper than in dark mode so pink text stays readable */
+  --pink: #ea3a85;
+  --pink-foreground: #1a1426;
 
-  --destructive: #d1206f;
-  --destructive-foreground: #ffffff;
+  --destructive: #ea3a85;
+  --destructive-foreground: #1a1426;
 
-  --border: #ddd3ee;
-  --input: #ddd3ee;
+  --border: #dbd7e4;
+  --input: #dbd7e4;
   --ring: #8a6cff;
 
   --overlay: rgb(26 20 38 / 0.45);

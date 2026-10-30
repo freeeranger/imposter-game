@@ -56,7 +56,7 @@ export function useTheme() {
     document.documentElement.classList.toggle("dark", theme === "dark");
     document
       .querySelector('meta[name="theme-color"]')
-      ?.setAttribute("content", theme === "dark" ? "#15111f" : "#f5f1fc");
+      ?.setAttribute("content", theme === "dark" ? "#15111f" : "#f2f0f6");
     setSystemBarsTheme(theme);
   }, [theme]);
 
